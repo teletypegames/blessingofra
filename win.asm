@@ -9,7 +9,7 @@ win_init:
     +prbig 3, 6, YELLOW, txt_escaped, 7
 
     +prtext 11, 15, WHITE, txt_welldone, txt_welldonee-txt_welldone
-    +prtext 13,  9, LGREY, txt_beaten, txt_beatene-txt_beaten
+    +prtext 13, 10, LGREY, txt_beaten, txt_beatene-txt_beaten
 
     lda #0
     sta washphase
@@ -70,7 +70,7 @@ wu_stay:
 txt_escaped:  !scr "escaped"
 txt_welldone: !scr "well done!"
 txt_welldonee:
-txt_beaten:   !scr "you beat the labyrinth"
+txt_beaten:   !scr "you beat labyrintwo"
 txt_beatene:
 txt_firemenu: !scr "fire = menu"
 txt_firemenue:

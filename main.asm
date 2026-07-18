@@ -1,5 +1,5 @@
 ; -----------------------------------------------------------
-; main.asm - LABYRINTH for the C64
+; main.asm - LABYRINTWO for the C64
 ;   two-player maze duel: player 1 runs the corridors toward
 ;   the green diamond exit while dodging the roaming colored
 ;   enemies; player 2 rides the wall corners with a cursor
@@ -9,7 +9,8 @@
 ; Files:
 ;   defs.asm    - constants, zero page, macros
 ;   intro.asm   - TTG boot logo (ported from rabbitc64)
-;   menu.asm    - main menu: play / rules / credits
+;   menu.asm    - main menu: play / options / rules / ...
+;   options.asm - optional extras: runner gun, spin cooldown
 ;   rules.asm   - how to play
 ;   controls.asm- joystick + keyboard mappings
 ;   credits.asm - the crew (content from rabbitc64, new look)
@@ -57,6 +58,9 @@ start:
 !ifdef AUTOCONTROLS {
     jsr controls_init
 } else {
+!ifdef AUTOOPTIONS {
+    jsr options_init
+} else {
 !ifdef AUTOCREDITS {
     jsr credits_init
 } else {
@@ -67,6 +71,7 @@ start:
     jsr lose_init
 } else {
     jsr intro_init       ; TTG logo, then the menu
+}
 }
 }
 }
@@ -106,6 +111,7 @@ wf_hit:
 ; ============================================================
 !src "intro.asm"
 !src "menu.asm"
+!src "options.asm"
 !src "rules.asm"
 !src "controls.asm"
 !src "credits.asm"

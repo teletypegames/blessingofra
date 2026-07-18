@@ -31,7 +31,9 @@ SFX_ROTATE = 2           ; wall spin: noise whoosh
 SFX_DENY   = 3           ; blocked spin: low buzz
 SFX_WIN    = 4           ; escape: rising jingle
 SFX_LOSE   = 5           ; caught: descending sweep
-NSFX       = 6
+SFX_SHOT   = 6           ; gun fired: short high tick
+SFX_HIT    = 7           ; enemy hit: noise burst
+NSFX       = 8
 
 ; ---- colors ----
 BLACK   = 0
@@ -74,6 +76,7 @@ CH_FLOOR  = $20          ; space: corridor
 CH_EXIT   = $5a          ; diamond: the goal
 CH_PLAYER = $51          ; filled ball: the runner
 CH_ENEMY  = $57          ; open circle: an enemy
+CH_SHOT   = $2a          ; asterisk: the runner's bullet
 
 COL_WALL = MGREY         ; spinnable wall pieces
 COL_POST = DGREY         ; fixed pivot posts
@@ -84,6 +87,8 @@ REP_HOLD    = 10         ; runner: frames before a held dir repeats
 REP_PERIOD  = 5          ; runner: frames between repeat steps
 CREP_HOLD   = 12         ; cursor: same, a touch slower
 CREP_PERIOD = 7
+COOL_TIME   = 160        ; spin cooldown option: recharge frames
+RESPAWN_TIME = 150       ; gun option: frames until a hit enemy returns
 RAS_SYNC    = 251        ; raster line polled for the frame sync
 
 ; ---- zero page pointers (same slots as rabbitc64) ----

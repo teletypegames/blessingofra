@@ -1,16 +1,18 @@
 ; -----------------------------------------------------------
-; menu.asm - full-screen menu card: big LABYRINTH title with
-; the gold wash, and a four-item menu: play / rules /
+; menu.asm - full-screen menu card: big LABYRINTWO title in
+; two colors (gold wash on LABYRIN, cool blue shimmer on
+; TWO), and a five-item menu: play / options / rules /
 ; controls / credits (joystick or w/s up/down + fire, space
 ; or return)
 ; -----------------------------------------------------------
 
-MENU_ITEMS = 4
+MENU_ITEMS = 5
 
 menu_init:
     jsr clear_screen
 
-    +prbig 2, 2, YELLOW, txt_title, 9
+    +prbig 2, 0, YELLOW, txt_t1, 7
+    +prbig 2, 28, CYAN, txt_t2, 3
     +prtext 9, 13, LGREY, txt_ttgname, 14
 
     lda #0
@@ -21,7 +23,8 @@ menu_init:
     rts
 
 menu_update:
-    ; gold wash rolling down the big title (rows 2-6)
+    ; the title rows 2-6: gold wash on LABYRIN (columns 0-26),
+    ; cool blue shimmer on TWO (columns 27-38)
     inc washphase
     lda #0
     sta g8row
@@ -39,7 +42,7 @@ mw_row:
     tax
     lda washtbl,x
     sta rtmp
-    ldy #37              ; the title spans columns 2-36
+    ldy #26
 mw_col:
     lda (scrlo),y
     cmp #$a0             ; only touch the letter blocks
@@ -48,8 +51,26 @@ mw_col:
     sta (collo),y
 mw_skip:
     dey
-    cpy #1
-    bne mw_col
+    bpl mw_col
+    lda washphase
+    lsr
+    clc
+    adc g8row
+    and #7
+    tax
+    lda cooltbl,x
+    sta rtmp
+    ldy #38
+mw_col2:
+    lda (scrlo),y
+    cmp #$a0
+    bne mw_skip2
+    lda rtmp
+    sta (collo),y
+mw_skip2:
+    dey
+    cpy #26
+    bne mw_col2
     inc g8row
     lda g8row
     cmp #5
@@ -104,10 +125,11 @@ mm_items:
 
     ; blinking '>' cursor in front of the picked line
     lda #$20
-    sta SCREEN+12*40+15
-    sta SCREEN+14*40+15
-    sta SCREEN+16*40+15
-    sta SCREEN+18*40+15
+    sta SCREEN+11*40+15
+    sta SCREEN+13*40+15
+    sta SCREEN+15*40+15
+    sta SCREEN+17*40+15
+    sta SCREEN+19*40+15
     lda framectr
     and #16
     bne mu_start
@@ -135,12 +157,16 @@ mu_start:
     lda menusel
     beq mg_play
     cmp #1
-    beq mg_rules
+    beq mg_options
     cmp #2
+    beq mg_rules
+    cmp #3
     beq mg_controls
     jmp credits_init     ; each init's rts returns to the main loop
 mg_play:
     jmp play_init
+mg_options:
+    jmp options_init
 mg_rules:
     jmp rules_init
 mg_controls:
@@ -169,19 +195,29 @@ dm_store:
     jmp print_text
 
 ; ---- menu tables ----
-mitem_lo:  !byte <txt_play, <txt_rules, <txt_controls, <txt_credits
-mitem_hi:  !byte >txt_play, >txt_rules, >txt_controls, >txt_credits
-mitem_len: !byte 4, 5, 8, 7
-mitem_row: !byte 12, 14, 16, 18
+mitem_lo:
+    !byte <txt_play, <txt_options, <txt_rules
+    !byte <txt_controls, <txt_credits
+mitem_hi:
+    !byte >txt_play, >txt_options, >txt_rules
+    !byte >txt_controls, >txt_credits
+mitem_len: !byte 4, 7, 5, 8, 7
+mitem_row: !byte 11, 13, 15, 17, 19
 mcur_lo:                 ; cursor cells: column 15 of those rows
-    !byte <(SCREEN+12*40+15), <(SCREEN+14*40+15)
-    !byte <(SCREEN+16*40+15), <(SCREEN+18*40+15)
+    !byte <(SCREEN+11*40+15), <(SCREEN+13*40+15)
+    !byte <(SCREEN+15*40+15), <(SCREEN+17*40+15)
+    !byte <(SCREEN+19*40+15)
 mcur_hi:
-    !byte >(SCREEN+12*40+15), >(SCREEN+14*40+15)
-    !byte >(SCREEN+16*40+15), >(SCREEN+18*40+15)
+    !byte >(SCREEN+11*40+15), >(SCREEN+13*40+15)
+    !byte >(SCREEN+15*40+15), >(SCREEN+17*40+15)
+    !byte >(SCREEN+19*40+15)
+
+cooltbl:                 ; blue-cyan-white shimmer for the TWO
+    !byte $06, $0e, $03, $01, $01, $03, $0e, $06
 
 ; ---- menu texts ----
 txt_play:    !scr "play"
+txt_options: !scr "options"
 txt_rules:   !scr "rules"
 txt_credits: !scr "credits"
 txt_info:    !scr "p1: joy2 / wasd - runner"

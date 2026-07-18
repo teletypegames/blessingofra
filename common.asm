@@ -357,7 +357,9 @@ bigmap:                  ; screen code (a=1..z=26) -> glyph index
     !byte 20, 18, 21,  0, 15,  0                   ; u-z
 
 ; ---- shared texts (screen codes) ----
-txt_title:   !scr "labyrinth"
+; the title is split so the two words can wear two colors
+txt_t1:      !scr "labyrin"
+txt_t2:      !scr "two"
 txt_ttgname: !scr "teletype games"
 txt_presents:!scr "presents"
 txt_return:  !scr "fire = return"

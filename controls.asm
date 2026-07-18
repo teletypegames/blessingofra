@@ -10,6 +10,7 @@ controls_init:
 
     +prtext  8,  9, LGREEN, txt_c1, txt_c1e-txt_c1
     +prtext 10,  6, WHITE,  txt_c2, txt_c2e-txt_c2
+    +prtext 11,  6, LGREY,  txt_c2b, txt_c2be-txt_c2b
 
     +prtext 13,  6, LBLUE,  txt_c3, txt_c3e-txt_c3
     +prtext 15,  6, WHITE,  txt_c4, txt_c4e-txt_c4
@@ -42,6 +43,8 @@ txt_c1: !scr "player 1 - the runner"
 txt_c1e:
 txt_c2: !scr "move: joystick 2 or w a s d"
 txt_c2e:
+txt_c2b: !scr "gun: fire or space, if enabled"
+txt_c2be:
 txt_c3: !scr "player 2 - the wall spinner"
 txt_c3e:
 txt_c4: !scr "move: joystick 1 or i j k l"

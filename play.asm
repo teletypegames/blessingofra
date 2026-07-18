@@ -6,6 +6,14 @@
 ; four wall pieces around the cursor by 90 degrees; the
 ; roaming colored enemies end the round on touch
 ;
+; optional extras (see options.asm):
+;   opt_shoot - player 1's fire shoots a bullet in the last
+;               direction faced; a hit enemy respawns on a
+;               random cell after RESPAWN_TIME frames
+;   opt_cool  - a spin starts a COOL_TIME recharge, shown as
+;               a draining bar on the status row; spins are
+;               denied (buzz) until it runs out
+;
 ; screen layout: status on row 0, the 39x23 maze lattice on
 ; rows 1-23 (cells = odd col / even row, posts = even col /
 ; odd row, wall slots = the rest), a hint line on row 24
@@ -13,7 +21,8 @@
 
 play_init:
     jsr clear_screen
-    +prtext 0, 0, WHITE, txt_title, 9
+    +prtext 0, 0, WHITE, txt_t1, 7
+    +prtext 0, 7, CYAN, txt_t2, 3
     +prtext 0, 28, LGREY, txt_goal, txt_goale-txt_goal
     +prtext 24, 6, DGREY, txt_hint, txt_hinte-txt_hint
 
@@ -81,11 +90,14 @@ pi_exit:
     lda #COL_EXIT
     sta (collo),y
 
-    ; the runner starts in the top-left cell
+    ; the runner starts in the top-left cell, facing right
     lda #1
     sta px
+    sta fdx
     lda #2
     sta py
+    lda #0
+    sta fdy
     jsr draw_player
 
     ; the corner cursor starts on the center post
@@ -96,14 +108,17 @@ pi_exit:
 
     jsr spawn_enemies
 
-    ; input state: a fire still held from the previous screen
-    ; must be released before it can spin walls
+    ; input state: fire still held from the previous screen
+    ; must be released before it can spin or shoot
     lda #0
     sta rheld
     sta cheld
     sta endflag
+    sta s_on
+    sta cool
     lda #1
     sta cfheld
+    sta rfheld
     +setupd play_update
     rts
 
@@ -260,7 +275,15 @@ mul19: !byte 0, 19, 38, 57, 76, 95, 114, 133, 152, 171, 190
 spawn_enemies:
     lda #0
     sta ei
-sn_loop:
+sn_all:
+    jsr spawn_one
+    inc ei
+    lda ei
+    cmp #NENEMIES
+    bne sn_all
+    rts
+
+spawn_one:               ; place enemy ei on a random free cell
 sn_rx:
     jsr rand8
     and #$0f
@@ -303,10 +326,8 @@ sn_ry:
     jsr rand8
     and #3
     sta edir,x
-    inc ei
-    lda ei
-    cmp #NENEMIES
-    bne sn_loop
+    lda #0
+    sta edead,x
     rts
 
 ecoltab:                 ; anything but the white runner / grey walls
@@ -316,14 +337,20 @@ ecoltab:                 ; anything but the white runner / grey walls
 ; one frame of play
 ; ============================================================
 play_update:
+    lda cool             ; the spin recharge ticks down
+    beq pu_nocool
+    dec cool
+pu_nocool:
     jsr upd_runner
     lda endflag
     bne pu_end
+    jsr upd_shot
     jsr upd_enemies
     lda endflag
     bne pu_end
     jsr upd_cursor
     jsr upd_flash
+    jsr upd_status
     rts
 pu_end:
     cmp #1
@@ -361,6 +388,7 @@ ur_first:
     lda #REP_HOLD
     sta rtimer
 ur_move:
+    ; decode the direction; it also becomes the gun's facing
     ldx px
     ldy py
     lda rdir
@@ -371,15 +399,31 @@ ur_move:
     lsr
     bcs ur_left
     inx                  ; right
+    lda #1
+    sta fdx
+    lda #0
+    sta fdy
     jmp ur_try
 ur_up:
     dey
+    lda #0
+    sta fdx
+    lda #$ff
+    sta fdy
     jmp ur_try
 ur_down:
     iny
+    lda #0
+    sta fdx
+    lda #1
+    sta fdy
     jmp ur_try
 ur_left:
     dex
+    lda #$ff
+    sta fdx
+    lda #0
+    sta fdy
 ur_try:
     stx ttx
     sty tty
@@ -393,7 +437,7 @@ ur_try:
     beq ur_win
     cmp #CH_ENEMY
     beq ur_dead
-    rts                  ; a wall: blocked
+    rts                  ; a wall (or the bullet): blocked
 ur_go:
     ldx py
     jsr row_ptr
@@ -424,6 +468,111 @@ draw_player:
     sta (scrlo),y
     lda #WHITE
     sta (collo),y
+    rts
+
+; ---- the optional gun: one straight-flying bullet ----
+upd_shot:
+    lda s_on
+    beq sh_nofly
+    ldx sy               ; wipe the bullet from its old spot -
+    jsr row_ptr          ; but only if it is really there: right
+    ldy sx               ; after firing this is the runner's own
+    lda (scrlo),y        ; cell, and the runner must stay drawn
+    cmp #CH_SHOT
+    bne sh_step
+    lda #CH_FLOOR
+    sta (scrlo),y
+    lda #BLACK
+    sta (collo),y
+sh_step:
+    lda sx               ; one step along its heading
+    clc
+    adc sdx
+    sta ttx
+    lda sy
+    clc
+    adc sdy
+    sta tty
+    ldx tty
+    jsr row_ptr
+    ldy ttx
+    lda (scrlo),y
+    cmp #CH_FLOOR
+    beq sh_fly
+    cmp #CH_ENEMY
+    beq sh_hit
+    lda #0               ; a wall (or anything else) stops it
+    sta s_on
+    jmp sh_nofly
+sh_fly:
+    lda ttx
+    sta sx
+    lda tty
+    sta sy
+    lda #CH_SHOT
+    sta (scrlo),y
+    lda #YELLOW
+    sta (collo),y
+    jmp sh_nofly
+sh_hit:
+    lda #0
+    sta s_on
+    jsr kill_enemy       ; scrlo/y still point at the victim
+sh_nofly:
+    lda opt_shoot        ; fire spawns a bullet (edge detected)
+    beq sh_done
+    lda joyb             ; read_joy ran in upd_runner this frame
+    and #JOY_FIRE
+    beq sh_frel
+    lda rfheld
+    bne sh_done
+    lda #1
+    sta rfheld
+    lda s_on
+    bne sh_done          ; one bullet at a time
+    lda px
+    sta sx
+    lda py
+    sta sy
+    lda fdx
+    sta sdx
+    lda fdy
+    sta sdy
+    lda #1
+    sta s_on
+    lda #SFX_SHOT
+    jmp sfx_play
+sh_frel:
+    lda #0
+    sta rfheld
+sh_done:
+    rts
+
+; ---- the bullet found an enemy at (ttx, tty): it starts its
+; respawn timer; the caller's scrlo/y still address its cell ----
+kill_enemy:
+    ldx #0
+ke_loop:
+    lda edead,x
+    bne ke_next
+    lda ex,x
+    cmp ttx
+    bne ke_next
+    lda ey,x
+    cmp tty
+    bne ke_next
+    lda #RESPAWN_TIME
+    sta edead,x
+    lda #CH_FLOOR
+    sta (scrlo),y
+    lda #BLACK
+    sta (collo),y
+    lda #SFX_HIT
+    jmp sfx_play
+ke_next:
+    inx
+    cpx #NENEMIES
+    bne ke_loop
     rts
 
 ; ---- player 2: the corner cursor + the wall spin ----
@@ -513,8 +662,16 @@ uc_done:
     rts
 
 ; ---- spin the four wall slots around post (kx, ky) by 90
-; degrees clockwise; denied while anyone stands in them ----
+; degrees clockwise; denied while anyone stands in them or
+; while the optional cooldown is still recharging ----
 do_rotate:
+    lda opt_cool
+    beq dr_ready
+    lda cool
+    beq dr_ready
+    lda #SFX_DENY        ; still recharging
+    jmp sfx_play
+dr_ready:
     ldx ky               ; gather the four slot chars
     dex
     jsr row_ptr
@@ -573,6 +730,11 @@ do_rotate:
     iny
     lda nch
     jsr put_slot
+    lda opt_cool         ; the spin starts the recharge
+    beq dr_nocool
+    lda #COOL_TIME
+    sta cool
+dr_nocool:
     lda #SFX_ROTATE
     jmp sfx_play
 rot_deny:
@@ -608,6 +770,13 @@ upd_enemies:
     sta ei
 ue_loop:
     ldx ei
+    lda edead,x
+    beq ue_alive
+    dec edead,x          ; shot down: waiting to respawn
+    bne ue_next
+    jsr spawn_one        ; the timer ran out: back on a fresh cell
+    jmp ue_next
+ue_alive:
     lda framectr
     clc
     adc estag,x
@@ -667,7 +836,7 @@ etry_dir:                ; A = direction; C clear when it moved (or won)
     beq ed_move
     cmp #CH_PLAYER
     beq ed_kill
-    sec                  ; wall, exit or another enemy: blocked
+    sec                  ; wall, exit, bullet or another enemy
     rts
 ed_kill:
     lda #2
@@ -704,7 +873,8 @@ ed_move:
     clc
     rts
 
-; ---- per-frame flashes: the exit blinks, the cursor pulses ----
+; ---- per-frame flashes: the exit blinks; the cursor pulses
+; yellow-red, dimmed to grey-red while the spin recharges ----
 upd_flash:
     ldx exrow
     jsr row_ptr
@@ -721,7 +891,20 @@ uf_exset:
     ldx ky
     jsr row_ptr
     ldy kx
-    lda framectr
+    lda opt_cool
+    beq uf_hot
+    lda cool
+    beq uf_hot
+    lda framectr         ; recharging: dimmed pulse
+    and #4
+    bne uf_cdred
+    lda #DGREY
+    jmp uf_cset
+uf_cdred:
+    lda #RED
+    jmp uf_cset
+uf_hot:
+    lda framectr         ; ready: bright pulse
     and #4
     bne uf_cred
     lda #YELLOW
@@ -732,23 +915,77 @@ uf_cset:
     sta (collo),y
     rts
 
+; ---- status row: the spin recharge readout (cooldown option)
+; "wait" + a draining bar while recharging, "ready" after ----
+upd_status:
+    lda opt_cool
+    bne us_show
+    rts
+us_show:
+    lda cool
+    beq us_ready
+    +prtext 0, 12, LRED, txt_wait, 4
+    lda cool             ; blocks left: (cool + 15) / 16 = 1-10
+    clc
+    adc #15
+    lsr
+    lsr
+    lsr
+    lsr
+    sta ptmp
+    ldx #9
+us_bar:
+    cpx ptmp
+    bcc us_blk           ; x < blocks: still filled
+    lda #$20
+    jmp us_put
+us_blk:
+    lda #$a0
+us_put:
+    sta SCREEN+18,x      ; bar cells: row 0, columns 18-27
+    lda #LRED
+    sta COLRAM+18,x
+    dex
+    bpl us_bar
+    rts
+us_ready:
+    +prtext 0, 12, LGREEN, txt_ready, 5
+    lda #$20             ; clear the bar area
+    ldx #9
+us_clr:
+    sta SCREEN+18,x
+    dex
+    bpl us_clr
+    rts
+
 ; ---- play texts ----
-txt_goal: !scr "reach the "
-          !byte CH_EXIT
+txt_goal:  !scr "reach the "
+           !byte CH_EXIT
 txt_goale:
-txt_hint: !scr "p1: joy2/wasd   p2: joy1/ijkl"
+txt_hint:  !scr "p1: joy2/wasd   p2: joy1/ijkl"
 txt_hinte:
+txt_wait:  !scr "wait"
+txt_ready: !scr "ready"
 
 ; ---- play variables ----
 px:      !byte 0         ; runner position (screen col / row)
 py:      !byte 0
+fdx:     !byte 0         ; runner facing: the gun aims this way
+fdy:     !byte 0
 kx:      !byte 0         ; corner cursor position (post col / row)
 ky:      !byte 0
 exrow:   !byte 0         ; screen row of the exit diamond
 endflag: !byte 0         ; 0 = playing, 1 = escaped, 2 = caught
+cool:    !byte 0         ; spin recharge frames left (cooldown option)
+s_on:    !byte 0         ; bullet in flight?
+sx:      !byte 0         ; bullet position and heading
+sy:      !byte 0
+sdx:     !byte 0
+sdy:     !byte 0
 rheld:   !byte 0         ; runner direction repeat state
 rtimer:  !byte 0
 rdir:    !byte 0
+rfheld:  !byte 0         ; runner fire edge detection state
 cheld:   !byte 0         ; cursor direction repeat state
 ctimer:  !byte 0
 cdir:    !byte 0
@@ -776,6 +1013,7 @@ ex:      !fill NENEMIES, 0   ; enemy positions, headings, colors
 ey:      !fill NENEMIES, 0
 edir:    !fill NENEMIES, 0
 ecol:    !fill NENEMIES, 0
+edead:   !fill NENEMIES, 0   ; respawn countdown, 0 = alive
 
 ; ---- maze generator buffers ----
 visited: !fill NCELLS, 0

@@ -57,12 +57,13 @@ su_slide:
 su_idle:
     rts
 
-; ---- effect tables: cursor, select, rotate, deny, win, lose ----
-sfxfreq:  !byte $50, $20, $12, $06, $20, $38
-sfxslide: !byte $00, $04, $fe, $00, $02, $ff
-sfxctrl:  !byte $11, $21, $81, $21, $11, $21
-sfxad:    !byte $06, $08, $08, $08, $0a, $0a
-sfxdur:   !byte $04, $0a, $08, $0c, $28, $30
+; ---- effect tables:
+; cursor, select, rotate, deny, win, lose, shot, hit ----
+sfxfreq:  !byte $50, $20, $12, $06, $20, $38, $60, $40
+sfxslide: !byte $00, $04, $fe, $00, $02, $ff, $fa, $fc
+sfxctrl:  !byte $11, $21, $81, $21, $11, $21, $11, $81
+sfxad:    !byte $06, $08, $08, $08, $0a, $0a, $05, $08
+sfxdur:   !byte $04, $0a, $08, $0c, $28, $30, $03, $08
 
 ; ---- driver variables ----
 sfx_timer: !byte 0       ; frames left of the current effect
