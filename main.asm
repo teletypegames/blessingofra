@@ -20,7 +20,7 @@
 ;   common.asm  - shared routines, input, RNG, texts
 ;   sound.asm   - single-voice SFX driver
 ;
-; Build: acme -f cbm -o labyrinth.prg main.asm
+; Build: acme -f cbm -o labyrintwo.prg main.asm
 ; -----------------------------------------------------------
 
 * = $0801

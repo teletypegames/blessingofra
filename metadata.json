@@ -1,9 +1,9 @@
 {
-  "name": "labyrinth",
+  "name": "labyrintwo",
   "title": "LabyrinTwo",
   "author": "Teletype Games",
-  "desc": "Two-player maze duel: one player runs for the exit while the other spins the walls of the labyrinth around their corners. Dodge the enemies, find the diamond.",
-  "site": "https://git.teletype.hu/games/labyrinth",
+  "desc": "Two-player maze duel: one player runs for the exit while the other spins the walls of the labyrintwo around their corners. Dodge the enemies, find the diamond.",
+  "site": "https://git.teletype.hu/games/labyrintwo",
   "license": "MIT",
   "version": "1.0.0"
 }

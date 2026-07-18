@@ -1,4 +1,4 @@
-# labyrinth (LabyrinTwo)
+# labyrintwo (LabyrinTwo)
 
 **LabyrinTwo** - a two-player maze duel for the Commodore 64
 (ACME + VICE), in the same spirit as [rabbitc64](../rabbitc64).
@@ -30,14 +30,14 @@ out to the menu).
 
 ```
 make deps       # macOS: brew install acme vice
-make build      # -> labyrinth.prg
+make build      # -> labyrintwo.prg
 make run        # build + launch in x64sc
 ```
 
 Test builds can boot straight into one state:
 
 ```
-acme -DAUTOPLAY=1 -f cbm -o labyrinth.prg main.asm
+acme -DAUTOPLAY=1 -f cbm -o labyrintwo.prg main.asm
 # also: AUTOOPTIONS, AUTORULES, AUTOCONTROLS, AUTOCREDITS,
 # AUTOWIN, AUTOLOSE; add -DFORCEOPTS=1 to start with both
 # options turned on
