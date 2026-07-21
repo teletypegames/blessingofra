@@ -33,7 +33,7 @@ co_hide:
 co_input:
     jsr start_edge
     beq co_stay
-    jmp menu_init
+    +fadeto menu_init
 co_stay:
     rts
 

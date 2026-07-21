@@ -9,10 +9,24 @@ BORDER  = $d020          ; border color register
 BG      = $d021          ; background color register
 SCREEN  = $0400          ; screen RAM (40x25 chars)
 COLRAM  = $d800          ; color RAM
-SPR_EN  = $d015          ; sprite enable bits (parked at 0)
+SCRCTL  = $d011          ; control 1: raster msb, y-scroll
+SPR_EN  = $d015          ; sprite enable bits
+SPRX0   = $d000          ; sprite 0 x (x/y pairs go up from here)
+SPRY0   = $d001          ; sprite 0 y
+SPRMSB  = $d010          ; 9th x position bit of each sprite
+SPRDBLY = $d017          ; sprite y expand
+VMCSB   = $d018          ; memory setup: screen + charset base
+SPRPRI  = $d01b          ; sprite/background priority
+SPRMCEN = $d01c          ; sprite multicolor enable
+SPRDBLX = $d01d          ; sprite x expand
+SPRCOL  = $d027          ; sprite colors, 8 registers
+CPUPORT = $01            ; 6510 port: ROM/RAM banking
 CIA1_PA = $dc00          ; CIA1 port A: keyboard columns / joystick 2
 CIA1_PB = $dc01          ; CIA1 port B: keyboard rows / joystick 1
 CIA1_TA = $dc04          ; CIA1 timer A low byte: free-running entropy
+
+CHARSET = $3800          ; RAM charset: ROM font + the custom tiles
+SPRPTR  = SCREEN + $3f8  ; sprite shape pointers
 
 ; ---- SID registers (single-voice SFX driver) ----
 SID_V1FL = $d400         ; voice 1 frequency low
@@ -71,16 +85,24 @@ MAZE_CH  = 11            ; cells down
 NCELLS   = MAZE_CW * MAZE_CH
 NENEMIES = 4
 
-CH_WALL   = $a0          ; inverse space: solid wall block
+; ---- characters (the custom tiles live in the RAM charset) ----
+CH_WALL   = $e0          ; brick block: spinnable wall piece
+CH_POST   = $e1          ; bolted plate: fixed pivot post
+CH_EXIT   = $e2          ; the portal out (4 animated glyph frames)
 CH_FLOOR  = $20          ; space: corridor
-CH_EXIT   = $5a          ; diamond: the goal
-CH_PLAYER = $51          ; filled ball: the runner
-CH_ENEMY  = $57          ; open circle: an enemy
-CH_SHOT   = $2a          ; asterisk: the runner's bullet
+CH_BAR    = $e3          ; 7 chars: a bar cell 1-7 pixels full
+
+; ---- the actors are hardware sprites ----
+SP_RUN  = 0              ; player 1, the runner
+SP_CUR  = 1              ; player 2, the corner cursor
+SP_SHOT = 2              ; the optional bullet
+SP_EN   = 3              ; the enemies ride sprites 3-6
 
 COL_WALL = MGREY         ; spinnable wall pieces
 COL_POST = DGREY         ; fixed pivot posts
-COL_EXIT = LGREEN        ; the exit diamond
+COL_EXIT = LGREEN        ; the exit portal
+COL_HILITE = YELLOW      ; walls the cursor's spin would move
+STATCOL  = BLUE          ; background band behind the status row
 
 ; ---- game timing ----
 REP_HOLD    = 10         ; runner: frames before a held dir repeats
@@ -90,6 +112,7 @@ CREP_PERIOD = 7
 COOL_TIME   = 160        ; spin cooldown option: recharge frames
 RESPAWN_TIME = 150       ; gun option: frames until a hit enemy returns
 RAS_SYNC    = 251        ; raster line polled for the frame sync
+BUILD_STEPS = 8          ; maze carve animation: generator steps a frame
 
 ; ---- zero page pointers (same slots as rabbitc64) ----
 txtlo  = $f5             ; text pointer for the print routines (2 bytes)
@@ -139,4 +162,14 @@ colhi  = $fe
     sta updvec
     lda #>.addr
     sta updvec+1
+}
+
+; ---- leave the current screen: fade to black, then run the
+; init routine of the next one ----
+!macro fadeto .addr {
+    lda #<.addr
+    sta fadevec
+    lda #>.addr
+    sta fadevec+1
+    jmp fade_start
 }

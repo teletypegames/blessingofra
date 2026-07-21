@@ -1,7 +1,7 @@
 ; -----------------------------------------------------------
 ; main.asm - LABYRINTWO for the C64
 ;   two-player maze duel: player 1 runs the corridors toward
-;   the green diamond exit while dodging the roaming colored
+;   the green exit portal while dodging the roaming colored
 ;   enemies; player 2 rides the wall corners with a cursor
 ;   and fire spins the four wall pieces around it by 90
 ;   degrees, reshaping the maze under the runner's feet
@@ -9,7 +9,7 @@
 ; Files:
 ;   defs.asm    - constants, zero page, macros
 ;   intro.asm   - TTG boot logo (ported from rabbitc64)
-;   menu.asm    - main menu: play / options / rules / ...
+;   menu.asm    - main menu over a dark maze backdrop
 ;   options.asm - optional extras: runner gun, spin cooldown
 ;   rules.asm   - how to play
 ;   controls.asm- joystick + keyboard mappings
@@ -19,6 +19,7 @@
 ;   over.asm    - game over screen with retry
 ;   common.asm  - shared routines, input, RNG, texts
 ;   sound.asm   - single-voice SFX driver
+;   gfx.asm     - RAM charset, sprite engine, fades
 ;
 ; Build: acme -f cbm -o labyrintwo.prg main.asm
 ; -----------------------------------------------------------
@@ -44,9 +45,10 @@ start:
     sta BORDER
     sta BG
     lda #0
-    sta SPR_EN           ; character-only game: sprites stay off
+    sta SPR_EN           ; the actors arrive with the game screen
     sta framectr
     sta fheld
+    jsr gfx_init         ; RAM charset + VIC + sprite registers
     jsr sfx_init
 
 !ifdef AUTOPLAY {        ; test builds boot straight into one state
@@ -81,13 +83,46 @@ start:
 
 ; ============================================================
 ; main loop - one state update per PAL frame, synced to the
-; raster beam in the lower border
+; raster beam in the lower border; the loop also paints the
+; border (event flashes decay back to the screen's base
+; color) and, when a screen asks for one, lays a background
+; band behind the status row with two more raster waits
 ; ============================================================
 main:
-    jsr wait_frame
+    jsr wait_frame       ; raster line RAS_SYNC, once a frame
+    lda bflash           ; border: flash, else the base color
+    beq mb_base
+    dec bflash
+    lda bcolor
+    jmp mb_border
+mb_base:
+    lda borbase
+mb_border:
+    sta BORDER
     inc framectr
     jsr rand8            ; stir the RNG once per frame
     jsr sfx_update       ; advance the sound effect
+    lda statbg           ; $ff = no band: update right away
+    bmi mb_update
+mb_w1:
+    bit SCRCTL           ; the beam reaches line 256...
+    bpl mb_w1
+mb_w2:
+    bit SCRCTL           ; ...and wraps to line 0
+    bmi mb_w2
+mb_w3:
+    lda RASTER
+    cmp #49              ; still in the border above the window
+    bcc mb_w3
+    lda statbg
+    sta BG
+mb_w4:
+    lda RASTER
+    cmp #59              ; the switch back hides behind row 1's
+    bcc mb_w4            ; wall tops (their top line is solid)
+    lda #BLACK
+    sta BG
+mb_update:
     jsr call_update
     jmp main
 
@@ -120,3 +155,4 @@ wf_hit:
 !src "over.asm"
 !src "common.asm"
 !src "sound.asm"
+!src "gfx.asm"

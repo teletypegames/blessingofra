@@ -11,6 +11,33 @@ MENU_ITEMS = 5
 menu_init:
     jsr clear_screen
 
+    ; a dark maze weaves behind the whole card
+    lda #DGREY
+    sta latwcol
+    sta latpcol
+    jsr draw_lattice
+    jsr gen_init
+    jsr gen_maze_full
+
+    ; a clean panel for the menu itself (rows 9-22, cols 4-35)
+    ldx #9
+mi_panel:
+    stx ptmp
+    jsr row_ptr
+    ldy #35
+mi_pcol:
+    lda #$20
+    sta (scrlo),y
+    lda #BLACK
+    sta (collo),y
+    dey
+    cpy #3
+    bne mi_pcol
+    ldx ptmp
+    inx
+    cpx #23
+    bne mi_panel
+
     +prbig 2, 0, YELLOW, txt_t1, 7
     +prbig 2, 28, CYAN, txt_t2, 3
     +prtext 9, 13, LGREY, txt_ttgname, 14
@@ -162,15 +189,15 @@ mu_start:
     beq mg_rules
     cmp #3
     beq mg_controls
-    jmp credits_init     ; each init's rts returns to the main loop
+    +fadeto credits_init ; every screen change fades to black
 mg_play:
-    jmp play_init
+    +fadeto play_init
 mg_options:
-    jmp options_init
+    +fadeto options_init
 mg_rules:
-    jmp rules_init
+    +fadeto rules_init
 mg_controls:
-    jmp controls_init
+    +fadeto controls_init
 mu_done:
     rts
 

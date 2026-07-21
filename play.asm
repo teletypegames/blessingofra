@@ -1,22 +1,25 @@
 ; -----------------------------------------------------------
-; play.asm - the game: a fresh maze is carved with a
-; recursive backtracker every round, player 1 (joystick 2)
-; runs the corridors toward the exit diamond, player 2
-; (joystick 1) rides the wall corners and fire spins the
-; four wall pieces around the cursor by 90 degrees; the
-; roaming colored enemies end the round on touch
+; play.asm - the game: a fresh maze carves itself on screen
+; every round (recursive backtracker, a few steps a frame),
+; player 1 (joystick 2) runs the corridors toward the exit
+; portal, player 2 (joystick 1) rides the wall corners and
+; fire spins the four wall pieces around the cursor by 90
+; degrees; the roaming enemies end the round on touch
+;
+; the walls, posts and the portal are chars (the screen stays
+; the wall data structure), but every actor - runner, cursor,
+; bullet, enemies - is a hardware sprite gliding between the
+; cells; actor collisions are grid coordinate checks
 ;
 ; optional extras (see options.asm):
 ;   opt_shoot - player 1's fire shoots a bullet in the last
 ;               direction faced; a hit enemy respawns on a
 ;               random cell after RESPAWN_TIME frames
 ;   opt_cool  - a spin starts a COOL_TIME recharge, shown as
-;               a draining bar on the status row; spins are
-;               denied (buzz) until it runs out
+;               a draining 1/8-step bar on the status row
 ;
-; screen layout: status on row 0, the 39x23 maze lattice on
-; rows 1-23 (cells = odd col / even row, posts = even col /
-; odd row, wall slots = the rest), a hint line on row 24
+; screen layout: status on row 0 (over the colored raster
+; band), the 39x23 maze lattice on rows 1-23, hints on row 24
 ; -----------------------------------------------------------
 
 play_init:
@@ -26,58 +29,39 @@ play_init:
     +prtext 0, 28, LGREY, txt_goal, txt_goale-txt_goal
     +prtext 24, 6, DGREY, txt_hint, txt_hinte-txt_hint
 
-    ; fill the whole lattice with wall blocks
-    ldx #1
-pi_fillrow:
-    stx ptmp
-    jsr row_ptr
-    ldy #38
-pi_fillcol:
-    lda #CH_WALL
-    sta (scrlo),y
     lda #COL_WALL
-    sta (collo),y
-    dey
-    bpl pi_fillcol
-    ldx ptmp
-    inx
-    cpx #24
-    bne pi_fillrow
-
-    ; the pivot posts get their own darker shade
-    ldx #1               ; post rows 1, 3, ... 23
-pi_postrow:
-    stx ptmp
-    jsr row_ptr
-    ldy #38              ; post columns 38, 36, ... 0
-pi_postcol:
+    sta latwcol
     lda #COL_POST
-    sta (collo),y
-    dey
-    dey
-    bpl pi_postcol
-    ldx ptmp
-    inx
-    inx
-    cpx #25
-    bcc pi_postrow
+    sta latpcol
+    jsr draw_lattice
+    jsr gen_init
 
-    ; carve the maze
-    ldx #0
-    lda #0
-pi_clrv:
-    sta visited,x
-    inx
-    cpx #NCELLS
-    bne pi_clrv
-    jsr gen_maze
+    lda #0               ; the actors arrive when the maze is done
+    sta SPR_EN
+    lda #STATCOL         ; the status row gets its color band
+    sta statbg
+    +setupd play_build
+    rts
 
-    ; the exit: a green diamond in the right border wall
-pi_exit:
+; ---- the maze carves itself, BUILD_STEPS steps a frame ----
+play_build:
+    lda #BUILD_STEPS
+    sta ptmp
+pb_loop:
+    jsr gm_step
+    bcs play_start
+    dec ptmp
+    bne pb_loop
+    rts
+
+; ---- the maze is done: exit, actors, sprites, input ----
+play_start:
+    ; the exit: a portal in the right border wall
+ps_exit:
     jsr rand8
     and #$0f
     cmp #MAZE_CH
-    bcs pi_exit
+    bcs ps_exit
     asl                  ; cell row -> screen row
     clc
     adc #2
@@ -98,13 +82,34 @@ pi_exit:
     sta py
     lda #0
     sta fdy
-    jsr draw_player
+    lda px
+    sta tgc
+    lda py
+    sta tgr
+    jsr set_target
+    ldx #SP_RUN
+    jsr spr_jump
 
     ; the corner cursor starts on the center post
     lda #18
     sta kx
     lda #11
     sta ky
+    lda #COL_HILITE
+    jsr mark_slots
+    lda kx
+    sta tgc
+    lda ky
+    sta tgr
+    jsr set_target
+    ldx #SP_CUR
+    jsr spr_jump
+
+    lda #WHITE
+    sta SPRCOL+SP_RUN
+    sta SPRCOL+SP_CUR
+    lda #YELLOW
+    sta SPRCOL+SP_SHOT
 
     jsr spawn_enemies
 
@@ -115,25 +120,79 @@ pi_exit:
     sta cheld
     sta endflag
     sta s_on
+    sta sx
+    sta sy
     sta cool
+    sta rotflash
     lda #1
     sta cfheld
     sta rfheld
     +setupd play_update
-    rts
+    jmp upd_sprites      ; positions, shapes and enables now
 
 ; ============================================================
 ; maze generation - recursive backtracker over the 19x11
 ; cells; the screen itself is the wall data structure
 ; ============================================================
-gen_maze:
+
+; fill rows 1-23 of the lattice: brick walls in latwcol, the
+; pivot posts (even col, odd row) in latpcol
+draw_lattice:
+    ldx #1
+dl_fill:
+    stx ptmp
+    jsr row_ptr
+    ldy #38
+dl_col:
+    lda #CH_WALL
+    sta (scrlo),y
+    lda latwcol
+    sta (collo),y
+    dey
+    bpl dl_col
+    ldx ptmp
+    inx
+    cpx #24
+    bne dl_fill
+    ldx #1               ; post rows 1, 3, ... 23
+dl_prow:
+    stx ptmp
+    jsr row_ptr
+    ldy #38              ; post columns 38, 36, ... 0
+dl_pcol:
+    lda #CH_POST
+    sta (scrlo),y
+    lda latpcol
+    sta (collo),y
+    dey
+    dey
+    bpl dl_pcol
+    ldx ptmp
+    inx
+    inx
+    cpx #25
+    bcc dl_prow
+    rts
+
+; reset the generator: nothing visited, start on cell (0,0)
+gen_init:
+    ldx #0
+    lda #0
+gi_clr:
+    sta visited,x
+    inx
+    cpx #NCELLS
+    bne gi_clr
     lda #0
     sta gcx
     sta gcy
     sta gsp
     jsr gv_mark
-    jsr carve_cell
-gm_loop:
+    jmp carve_cell
+
+; one generator step: carve toward a random unvisited
+; neighbor, or back up one; C set when the maze is finished
+gm_step:
     ; collect the unvisited neighbor directions
     lda #0
     sta gn
@@ -200,7 +259,8 @@ gm_pick:
     sta gcy
     jsr gv_mark
     jsr carve_cell
-    jmp gm_loop
+    clc
+    rts
 gm_pop:
     ; dead end: back up; empty stack = the maze is done
     lda gsp
@@ -211,8 +271,15 @@ gm_pop:
     sta gcx
     lda stacky,x
     sta gcy
-    jmp gm_loop
+    clc
+    rts
 gm_done:
+    sec
+    rts
+
+gen_maze_full:           ; the menu backdrop wants it all at once
+    jsr gm_step
+    bcc gen_maze_full
     rts
 
 gv_mark:                 ; visited[gcy * 19 + gcx] = 1
@@ -290,11 +357,11 @@ sn_rx:
     cmp #MAZE_CH
     bcs sn_rx
     clc
-    adc #MAZE_CW-MAZE_CH ; cell column 8-18: away from the runner
+    adc #MAZE_CW-MAZE_CH ; cell column 8-18: away from the start
     asl
     clc
     adc #1
-    sta gnx              ; candidate screen column
+    sta ttx              ; candidate screen column
 sn_ry:
     jsr rand8
     and #$0f
@@ -303,32 +370,48 @@ sn_ry:
     asl
     clc
     adc #2
-    sta gny              ; candidate screen row
-    ldx gny
+    sta tty              ; candidate screen row
+    ldx tty
     jsr row_ptr
-    ldy gnx
+    ldy ttx
     lda (scrlo),y
-    cmp #CH_FLOOR        ; only an empty cell will do
+    cmp #CH_FLOOR        ; only a carved cell will do...
     bne sn_rx
-    lda #CH_ENEMY
-    sta (scrlo),y
+    lda ttx              ; ...without the runner on it...
+    cmp px
+    bne sn_free
+    lda tty
+    cmp py
+    beq sn_rx
+sn_free:
+    jsr enemy_at         ; ...or another live enemy
+    bcs sn_rx
+    ldx ei
+    lda ttx
+    sta ex,x
+    lda tty
+    sta ey,x
     jsr rand8
     and #7
-    tax
-    lda ecoltab,x
-    sta (collo),y
-    ldx ei
+    tay
+    lda ecoltab,y
     sta ecol,x
-    lda gnx
-    sta ex,x
-    lda gny
-    sta ey,x
+    sta SPRCOL+SP_EN,x
     jsr rand8
     and #3
     sta edir,x
     lda #0
     sta edead,x
-    rts
+    lda ttx              ; the sprite pops in on the cell
+    sta tgc
+    lda tty
+    sta tgr
+    jsr set_target
+    lda ei
+    clc
+    adc #SP_EN
+    tax
+    jmp spr_jump
 
 ecoltab:                 ; anything but the white runner / grey walls
     !byte RED, CYAN, PURPLE, YELLOW, ORANGE, LRED, LBLUE, BLUE
@@ -351,19 +434,19 @@ pu_nocool:
     jsr upd_cursor
     jsr upd_flash
     jsr upd_status
-    rts
+    jmp upd_sprites
 pu_end:
     cmp #1
     beq pu_win
     lda #SFX_LOSE
     jsr sfx_play
-    jmp lose_init        ; its rts returns to the main loop
+    +fadeto lose_init
 pu_win:
     lda #SFX_WIN
     jsr sfx_play
-    jmp win_init
+    +fadeto win_init
 
-; ---- player 1: walk the corridors, one char per step ----
+; ---- player 1: walk the corridors, one cell per step ----
 upd_runner:
     jsr read_joy
     and #$0f
@@ -431,26 +514,18 @@ ur_try:
     jsr row_ptr
     ldy ttx
     lda (scrlo),y
-    cmp #CH_FLOOR
-    beq ur_go
     cmp #CH_EXIT
     beq ur_win
-    cmp #CH_ENEMY
-    beq ur_dead
-    rts                  ; a wall (or the bullet): blocked
-ur_go:
-    ldx py
-    jsr row_ptr
-    ldy px
-    lda #CH_FLOOR
-    sta (scrlo),y
-    lda #BLACK
-    sta (collo),y
+    cmp #CH_FLOOR
+    bne ur_stop          ; a wall or a post: blocked
+    jsr enemy_at         ; walking into an enemy still hurts
+    bcs ur_dead
     lda ttx
     sta px
     lda tty
     sta py
-    jmp draw_player
+ur_stop:
+    rts
 ur_win:
     lda #1
     sta endflag
@@ -460,31 +535,10 @@ ur_dead:
     sta endflag
     rts
 
-draw_player:
-    ldx py
-    jsr row_ptr
-    ldy px
-    lda #CH_PLAYER
-    sta (scrlo),y
-    lda #WHITE
-    sta (collo),y
-    rts
-
-; ---- the optional gun: one straight-flying bullet ----
+; ---- the optional gun: one straight-flying bullet sprite ----
 upd_shot:
     lda s_on
-    beq sh_nofly
-    ldx sy               ; wipe the bullet from its old spot -
-    jsr row_ptr          ; but only if it is really there: right
-    ldy sx               ; after firing this is the runner's own
-    lda (scrlo),y        ; cell, and the runner must stay drawn
-    cmp #CH_SHOT
-    bne sh_step
-    lda #CH_FLOOR
-    sta (scrlo),y
-    lda #BLACK
-    sta (collo),y
-sh_step:
+    beq sh_spawn
     lda sx               ; one step along its heading
     clc
     adc sdx
@@ -498,27 +552,23 @@ sh_step:
     ldy ttx
     lda (scrlo),y
     cmp #CH_FLOOR
-    beq sh_fly
-    cmp #CH_ENEMY
-    beq sh_hit
-    lda #0               ; a wall (or anything else) stops it
+    beq sh_open
+    lda #0               ; a wall (or the portal) stops it
     sta s_on
-    jmp sh_nofly
+    jmp sh_spawn
+sh_open:
+    jsr enemy_at
+    bcc sh_fly
+    jsr kill_idx         ; X = the victim
+    lda #0
+    sta s_on
+    jmp sh_spawn
 sh_fly:
     lda ttx
     sta sx
     lda tty
     sta sy
-    lda #CH_SHOT
-    sta (scrlo),y
-    lda #YELLOW
-    sta (collo),y
-    jmp sh_nofly
-sh_hit:
-    lda #0
-    sta s_on
-    jsr kill_enemy       ; scrlo/y still point at the victim
-sh_nofly:
+sh_spawn:
     lda opt_shoot        ; fire spawns a bullet (edge detected)
     beq sh_done
     lda joyb             ; read_joy ran in upd_runner this frame
@@ -548,31 +598,37 @@ sh_frel:
 sh_done:
     rts
 
-; ---- the bullet found an enemy at (ttx, tty): it starts its
-; respawn timer; the caller's scrlo/y still address its cell ----
-kill_enemy:
-    ldx #0
-ke_loop:
-    lda edead,x
-    bne ke_next
-    lda ex,x
-    cmp ttx
-    bne ke_next
-    lda ey,x
-    cmp tty
-    bne ke_next
+; ---- enemy X was hit: it starts its respawn timer ----
+kill_idx:
     lda #RESPAWN_TIME
     sta edead,x
-    lda #CH_FLOOR
-    sta (scrlo),y
-    lda #BLACK
-    sta (collo),y
+    lda #4               ; white border blip
+    sta bflash
+    lda #WHITE
+    sta bcolor
     lda #SFX_HIT
     jmp sfx_play
-ke_next:
+
+; ---- is a live enemy standing on (ttx, tty)?
+; returns C set + its index in X when one is ----
+enemy_at:
+    ldx #0
+ea_loop:
+    lda edead,x
+    bne ea_next
+    lda ex,x
+    cmp ttx
+    bne ea_next
+    lda ey,x
+    cmp tty
+    bne ea_next
+    sec
+    rts
+ea_next:
     inx
     cpx #NENEMIES
-    bne ke_loop
+    bne ea_loop
+    clc
     rts
 
 ; ---- player 2: the corner cursor + the wall spin ----
@@ -635,15 +691,16 @@ uc_left:
 uc_go:
     stx ttx
     sty tty
-    ldx ky               ; the old post gets its color back
-    jsr row_ptr
-    ldy kx
-    lda #COL_POST
-    sta (collo),y
+    lda #COL_WALL        ; the old corner's walls lose the highlight
+    jsr mark_slots
+    lda #0               ; a spin flash does not follow the cursor
+    sta rotflash
     lda ttx
     sta kx
     lda tty
     sta ky
+    lda #COL_HILITE      ; show the walls a spin here would move
+    jsr mark_slots
     lda #SFX_CURSOR
     jsr sfx_play
 uc_fire:
@@ -669,9 +726,33 @@ do_rotate:
     beq dr_ready
     lda cool
     beq dr_ready
-    lda #SFX_DENY        ; still recharging
-    jmp sfx_play
+dr_deny:
+    jmp rot_deny         ; still recharging / a slot is taken
 dr_ready:
+    lda kx               ; nobody may stand in the four slots
+    sta ttx
+    ldx ky
+    dex
+    stx tty
+    jsr slot_occ
+    bcs dr_deny
+    ldx ky
+    inx
+    stx tty
+    jsr slot_occ
+    bcs dr_deny
+    lda ky
+    sta tty
+    ldx kx
+    dex
+    stx ttx
+    jsr slot_occ
+    bcs dr_deny
+    ldx kx
+    inx
+    stx ttx
+    jsr slot_occ
+    bcs dr_deny
     ldx ky               ; gather the four slot chars
     dex
     jsr row_ptr
@@ -694,19 +775,6 @@ dr_ready:
     iny
     lda (scrlo),y
     sta ech
-    ; every slot must be plain wall or floor
-    lda nch
-    jsr rot_ok
-    bcs rot_deny
-    lda sch
-    jsr rot_ok
-    bcs rot_deny
-    lda wch
-    jsr rot_ok
-    bcs rot_deny
-    lda ech
-    jsr rot_ok
-    bcs rot_deny
     ; clockwise: north<-west, east<-north, south<-east, west<-south
     ldx ky
     dex
@@ -730,6 +798,8 @@ dr_ready:
     iny
     lda nch
     jsr put_slot
+    lda #10              ; the moved pieces flash white
+    sta rotflash
     lda opt_cool         ; the spin starts the recharge
     beq dr_nocool
     lda #COOL_TIME
@@ -738,18 +808,36 @@ dr_nocool:
     lda #SFX_ROTATE
     jmp sfx_play
 rot_deny:
+    lda #6               ; red border blip on a denied spin
+    sta bflash
+    lda #RED
+    sta bcolor
     lda #SFX_DENY
     jmp sfx_play
 
-rot_ok:                  ; C clear when A is spinnable (wall or floor)
-    cmp #CH_WALL
-    beq ro_yes
-    cmp #CH_FLOOR
-    beq ro_yes
-    sec
-    rts
-ro_yes:
+slot_occ:                ; C set when someone stands on (ttx, tty)
+    lda px
+    cmp ttx
+    bne so_norun
+    lda py
+    cmp tty
+    beq so_yes
+so_norun:
+    jsr enemy_at
+    bcs so_yes
+    lda s_on
+    beq so_no
+    lda sx
+    cmp ttx
+    bne so_no
+    lda sy
+    cmp tty
+    beq so_yes
+so_no:
     clc
+    rts
+so_yes:
+    sec
     rts
 
 put_slot:                ; write char A at (scrlo),y + matching color
@@ -762,6 +850,37 @@ put_slot:                ; write char A at (scrlo),y + matching color
 ps_wall:
     lda #COL_WALL
     sta (collo),y
+    rts
+
+; ---- paint the four slots around the cursor post with the
+; color in A - only wall blocks change, so the highlight marks
+; exactly the pieces a spin would move (floors stay black) ----
+mark_slots:
+    sta hlcol
+    ldx ky               ; north
+    dex
+    jsr row_ptr
+    ldy kx
+    jsr mark_one
+    ldx ky               ; south
+    inx
+    jsr row_ptr
+    ldy kx
+    jsr mark_one
+    ldx ky               ; west
+    jsr row_ptr
+    ldy kx
+    dey
+    jsr mark_one
+    iny                  ; east: falls through to mark it
+    iny
+mark_one:
+    lda (scrlo),y
+    cmp #CH_WALL
+    bne mo_skip
+    lda hlcol
+    sta (collo),y
+mo_skip:
     rts
 
 ; ---- the enemies: staggered random walkers ----
@@ -828,54 +947,61 @@ etry_dir:                ; A = direction; C clear when it moved (or won)
     clc
     adc dytab,x
     sta tty
-    ldx tty
-    jsr row_ptr
-    ldy ttx
-    lda (scrlo),y
-    cmp #CH_FLOOR
-    beq ed_move
-    cmp #CH_PLAYER
-    beq ed_kill
-    sec                  ; wall, exit, bullet or another enemy
-    rts
-ed_kill:
+    lda px               ; onto the runner: the round is over
+    cmp ttx
+    bne en_norun
+    lda py
+    cmp tty
+    bne en_norun
     lda #2
     sta endflag
     clc
     rts
-ed_move:
+en_norun:
+    ldx tty              ; anything but open floor blocks it
+    jsr row_ptr
+    ldy ttx
+    lda (scrlo),y
+    cmp #CH_FLOOR
+    beq en_open
+    sec
+    rts
+en_open:
+    jsr enemy_at         ; another enemy blocks it
+    bcc en_nofoe
+    sec
+    rts
+en_nofoe:
+    lda s_on             ; walking into the bullet hurts too
+    beq en_move
+    lda sx
+    cmp ttx
+    bne en_move
+    lda sy
+    cmp tty
+    bne en_move
+    lda #0
+    sta s_on
     ldx ei
-    lda ey,x
-    sta gny              ; old position
-    lda ex,x
-    sta gnx
+    jsr kill_idx
+    clc
+    rts
+en_move:
+    ldx ei
     lda ttx
     sta ex,x
     lda tty
     sta ey,x
     lda etd
     sta edir,x
-    ldx gny              ; erase the old cell
-    jsr row_ptr
-    ldy gnx
-    lda #CH_FLOOR
-    sta (scrlo),y
-    lda #BLACK
-    sta (collo),y
-    ldx tty              ; draw at the new one
-    jsr row_ptr
-    ldy ttx
-    lda #CH_ENEMY
-    sta (scrlo),y
-    ldx ei
-    lda ecol,x
-    sta (collo),y
     clc
     rts
 
-; ---- per-frame flashes: the exit blinks; the cursor pulses
-; yellow-red, dimmed to grey-red while the spin recharges ----
+; ---- per-frame flashes: the portal spins and blinks, the
+; freshly spun walls flash white, the cursor shows the
+; recharge state on its own color ----
 upd_flash:
+    jsr upd_portal       ; cycle the portal glyph
     ldx exrow
     jsr row_ptr
     ldy #38
@@ -888,35 +1014,31 @@ uf_exw:
     lda #WHITE
 uf_exset:
     sta (collo),y
-    ldx ky
-    jsr row_ptr
-    ldy kx
-    lda opt_cool
+    lda rotflash         ; the spun walls flash, then re-highlight
+    beq uf_norf
+    dec rotflash
+    bne uf_white
+    lda #COL_HILITE
+    jmp uf_mark
+uf_white:
+    lda #WHITE
+uf_mark:
+    jsr mark_slots
+uf_norf:
+    lda opt_cool         ; the cursor dims red while recharging
     beq uf_hot
     lda cool
     beq uf_hot
-    lda framectr         ; recharging: dimmed pulse
-    and #4
-    bne uf_cdred
-    lda #DGREY
-    jmp uf_cset
-uf_cdred:
     lda #RED
     jmp uf_cset
 uf_hot:
-    lda framectr         ; ready: bright pulse
-    and #4
-    bne uf_cred
-    lda #YELLOW
-    jmp uf_cset
-uf_cred:
-    lda #RED
+    lda #WHITE
 uf_cset:
-    sta (collo),y
+    sta SPRCOL+SP_CUR
     rts
 
 ; ---- status row: the spin recharge readout (cooldown option)
-; "wait" + a draining bar while recharging, "ready" after ----
+; "wait" + a bar draining pixel by pixel, "ready" after ----
 upd_status:
     lda opt_cool
     bne us_show
@@ -925,28 +1047,35 @@ us_show:
     lda cool
     beq us_ready
     +prtext 0, 12, LRED, txt_wait, 4
-    lda cool             ; blocks left: (cool + 15) / 16 = 1-10
-    clc
-    adc #15
-    lsr
-    lsr
-    lsr
+    lda cool             ; pixels left: cool / 2 = 0-80
     lsr
     sta ptmp
-    ldx #9
+    ldx #0
 us_bar:
-    cpx ptmp
-    bcc us_blk           ; x < blocks: still filled
-    lda #$20
-    jmp us_put
-us_blk:
+    lda ptmp
+    beq us_empty
+    cmp #8
+    bcc us_part
+    sec                  ; a full cell, and onward
+    sbc #8
+    sta ptmp
     lda #$a0
+    jmp us_put
+us_part:
+    clc                  ; 1-7 pixels: one of the bar chars
+    adc #CH_BAR-1
+    ldy #0
+    sty ptmp
+    jmp us_put
+us_empty:
+    lda #$20
 us_put:
     sta SCREEN+18,x      ; bar cells: row 0, columns 18-27
     lda #LRED
     sta COLRAM+18,x
-    dex
-    bpl us_bar
+    inx
+    cpx #10
+    bne us_bar
     rts
 us_ready:
     +prtext 0, 12, LGREEN, txt_ready, 5
@@ -957,6 +1086,113 @@ us_clr:
     dex
     bpl us_clr
     rts
+
+; ---- drive the eight sprites from the grid state ----
+upd_sprites:
+    lda framectr
+    lsr
+    lsr
+    lsr
+    sta frame8
+    ; the runner glides 2 pixels a frame
+    lda px
+    sta tgc
+    lda py
+    sta tgr
+    jsr set_target
+    lda #2
+    sta gspd
+    ldx #SP_RUN
+    jsr spr_glide
+    ; the cursor glides 4 (its step is two cells)
+    lda kx
+    sta tgc
+    lda ky
+    sta tgr
+    jsr set_target
+    lda #4
+    sta gspd
+    ldx #SP_CUR
+    jsr spr_glide
+    ; the bullet snaps cell to cell
+    lda sx
+    sta tgc
+    lda sy
+    sta tgr
+    jsr set_target
+    ldx #SP_SHOT
+    jsr spr_jump
+    ; the enemies glide 1
+    lda #1
+    sta gspd
+    ldx #0
+us_en:
+    stx ptmp
+    lda ex,x
+    sta tgc
+    lda ey,x
+    sta tgr
+    jsr set_target
+    lda ptmp
+    clc
+    adc #SP_EN
+    tax
+    jsr spr_glide
+    ldx ptmp
+    inx
+    cpx #NENEMIES
+    bne us_en
+    ; shapes: the runner bobs, each enemy waves on its own beat
+    lda frame8
+    and #1
+    clc
+    adc #SPR_RUN
+    sta SPRPTR+SP_RUN
+    lda #SPR_CUR
+    sta SPRPTR+SP_CUR
+    lda #SPR_SHOT
+    sta SPRPTR+SP_SHOT
+    ldx #0
+us_shape:
+    txa
+    clc
+    adc frame8
+    and #1
+    sta rtmp
+    lda #SPR_ENA         ; enemies 0-1 are ghosts, 2-3 crawlers
+    cpx #2
+    bcc us_seta
+    lda #SPR_ENB
+us_seta:
+    clc
+    adc rtmp
+    sta SPRPTR+SP_EN,x
+    inx
+    cpx #NENEMIES
+    bne us_shape
+    ; enable: runner + cursor + the bullet and the live enemies
+    lda #%00000011
+    ldy s_on
+    beq us_nosht
+    ora #%00000100
+us_nosht:
+    sta rtmp
+    ldx #0
+us_alive:
+    lda edead,x
+    bne us_dead
+    lda rtmp
+    ora ebit,x
+    sta rtmp
+us_dead:
+    inx
+    cpx #NENEMIES
+    bne us_alive
+    lda rtmp
+    sta SPR_EN
+    jmp spr_commit
+
+ebit: !byte 8, 16, 32, 64
 
 ; ---- play texts ----
 txt_goal:  !scr "reach the "
@@ -974,9 +1210,10 @@ fdx:     !byte 0         ; runner facing: the gun aims this way
 fdy:     !byte 0
 kx:      !byte 0         ; corner cursor position (post col / row)
 ky:      !byte 0
-exrow:   !byte 0         ; screen row of the exit diamond
+exrow:   !byte 0         ; screen row of the exit portal
 endflag: !byte 0         ; 0 = playing, 1 = escaped, 2 = caught
 cool:    !byte 0         ; spin recharge frames left (cooldown option)
+rotflash:!byte 0         ; frames the freshly spun walls stay white
 s_on:    !byte 0         ; bullet in flight?
 sx:      !byte 0         ; bullet position and heading
 sy:      !byte 0
@@ -998,6 +1235,10 @@ nch:     !byte 0         ; the four slot chars around the cursor
 ech:     !byte 0
 sch:     !byte 0
 wch:     !byte 0
+hlcol:   !byte 0         ; mark_slots color parameter
+latwcol: !byte 0         ; draw_lattice colors: walls, posts
+latpcol: !byte 0
+frame8:  !byte 0         ; framectr / 8: the animation beat
 ei:      !byte 0         ; enemy loop index
 etries:  !byte 0
 etd:     !byte 0

@@ -6,6 +6,9 @@
 lose_init:
     jsr clear_screen
 
+    lda #RED             ; the border mourns with the letters
+    sta borbase
+
     +prbig 3, 2, RED, txt_gameover, 9
 
     +prtext 11, 10, WHITE, txt_caught, txt_caughte-txt_caught
@@ -28,7 +31,7 @@ lu_input:
     ; fire or space: straight back in with a fresh maze
     jsr start_edge
     beq lu_nofire
-    jmp play_init
+    +fadeto play_init
 lu_nofire:
     ; the m key: keyboard column 4, row bit 4 (start_edge has
     ; already returned zero here, so joystick fire is not
@@ -40,7 +43,7 @@ lu_nofire:
     bne lu_done
     lda #$ff
     sta CIA1_PA
-    jmp menu_init
+    +fadeto menu_init
 lu_done:
     lda #$ff
     sta CIA1_PA

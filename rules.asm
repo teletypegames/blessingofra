@@ -33,7 +33,7 @@ ru_hide:
 ru_input:
     jsr start_edge
     beq ru_stay
-    jmp menu_init
+    +fadeto menu_init
 ru_stay:
     rts
 

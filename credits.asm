@@ -135,7 +135,7 @@ cu_hide:
 cu_input:
     jsr start_edge
     beq cu_stay
-    jmp menu_init        ; back to the menu
+    +fadeto menu_init    ; back to the menu
 cu_stay:
     rts
 

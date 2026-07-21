@@ -17,6 +17,15 @@ win_init:
     rts
 
 win_update:
+    ; the border celebrates along on the same gold ramp
+    lda framectr
+    lsr
+    lsr
+    and #15
+    tax
+    lda washtbl,x
+    sta borbase
+
     ; the gold wash rolls down the big letters (rows 3-7)
     inc washphase
     lda #0
@@ -62,7 +71,7 @@ wu_hide:
 wu_input:
     jsr start_edge
     beq wu_stay
-    jmp menu_init        ; a win leads back to the main screen
+    +fadeto menu_init    ; a win leads back to the main screen
 wu_stay:
     rts
 

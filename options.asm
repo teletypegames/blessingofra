@@ -122,7 +122,7 @@ ou_done:
 ou_back:
     lda #SFX_SELECT
     jsr sfx_play
-    jmp menu_init
+    +fadeto menu_init
 
 ; ---- draw option line X, yellow when it is the picked one ----
 draw_oitem:
