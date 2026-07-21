@@ -9,6 +9,8 @@ sfx_init:
     sta SID_VOL
     lda #0
     sta SID_V1CR
+    sta SID_V1FH
+    sta SID_V1FL
     sta sfx_timer
     rts
 
@@ -44,9 +46,10 @@ sfx_update:
     beq su_idle
     dec sfx_timer
     bne su_slide
-    lda sfx_ctrl         ; time is up: gate off
-    and #$fe
-    sta SID_V1CR
+    lda #0               ; time is up: hard-silence the voice -
+    sta SID_V1CR         ; waveform and frequency go too, so a
+    sta SID_V1FH         ; hung envelope (the 6581 ADSR bug on
+    sta SID_V1FL         ; fast retriggers) cannot whistle on
     rts
 su_slide:
     lda sfx_fh           ; bend the pitch by the slide value

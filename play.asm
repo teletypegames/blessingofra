@@ -26,7 +26,7 @@ play_init:
     jsr clear_screen
     +prtext 0, 0, WHITE, txt_t1, 7
     +prtext 0, 7, CYAN, txt_t2, 3
-    +prtext 0, 28, LGREY, txt_goal, txt_goale-txt_goal
+    +prtext 0, 34, LGREY, txt_goal, txt_goale-txt_goal
     +prtext 24, 6, DGREY, txt_hint, txt_hinte-txt_hint
 
     lda #COL_WALL
@@ -124,6 +124,9 @@ ps_exit:
     sta sy
     sta cool
     sta rotflash
+    sta tframe           ; the clock starts when the maze is done
+    sta tsec
+    sta tmin
     lda #1
     sta cfheld
     sta rfheld
@@ -420,6 +423,25 @@ ecoltab:                 ; anything but the white runner / grey walls
 ; one frame of play
 ; ============================================================
 play_update:
+    inc tframe           ; the round clock: 50 frames = one second
+    lda tframe
+    cmp #50
+    bne pu_clock
+    lda #0
+    sta tframe
+    inc tsec
+    lda tsec
+    cmp #60
+    bne pu_clock
+    lda #0
+    sta tsec
+    inc tmin
+    lda tmin
+    cmp #100             ; the clock pegs at 99:59
+    bne pu_clock
+    lda #99
+    sta tmin
+pu_clock:
     lda cool             ; the spin recharge ticks down
     beq pu_nocool
     dec cool
@@ -434,6 +456,7 @@ pu_nocool:
     jsr upd_cursor
     jsr upd_flash
     jsr upd_status
+    jsr upd_clock
     jmp upd_sprites
 pu_end:
     cmp #1
@@ -1046,7 +1069,7 @@ upd_status:
 us_show:
     lda cool
     beq us_ready
-    +prtext 0, 12, LRED, txt_wait, 4
+    +prtext 0, 17, LRED, txt_wait, 4
     lda cool             ; pixels left: cool / 2 = 0-80
     lsr
     sta ptmp
@@ -1070,21 +1093,41 @@ us_part:
 us_empty:
     lda #$20
 us_put:
-    sta SCREEN+18,x      ; bar cells: row 0, columns 18-27
+    sta SCREEN+23,x      ; bar cells: row 0, columns 23-32
     lda #LRED
-    sta COLRAM+18,x
+    sta COLRAM+23,x
     inx
     cpx #10
     bne us_bar
     rts
 us_ready:
-    +prtext 0, 12, LGREEN, txt_ready, 5
+    +prtext 0, 17, LGREEN, txt_ready, 5
     lda #$20             ; clear the bar area
     ldx #9
 us_clr:
-    sta SCREEN+18,x
+    sta SCREEN+23,x
     dex
     bpl us_clr
+    rts
+
+; ---- the round clock, live on the status row ----
+upd_clock:
+    lda tmin
+    jsr two_digits
+    stx SCREEN+11        ; clock cells: row 0, columns 11-15
+    sta SCREEN+12
+    lda #$3a             ; ':'
+    sta SCREEN+13
+    lda tsec
+    jsr two_digits
+    stx SCREEN+14
+    sta SCREEN+15
+    ldx #4
+ucl_col:
+    lda #LGREY
+    sta COLRAM+11,x
+    dex
+    bpl ucl_col
     rts
 
 ; ---- drive the eight sprites from the grid state ----
@@ -1195,7 +1238,7 @@ us_dead:
 ebit: !byte 8, 16, 32, 64
 
 ; ---- play texts ----
-txt_goal:  !scr "reach the "
+txt_goal:  !scr "exit "
            !byte CH_EXIT
 txt_goale:
 txt_hint:  !scr "p1: joy2/wasd   p2: joy1/ijkl"
@@ -1238,6 +1281,9 @@ wch:     !byte 0
 hlcol:   !byte 0         ; mark_slots color parameter
 latwcol: !byte 0         ; draw_lattice colors: walls, posts
 latpcol: !byte 0
+tframe:  !byte 0         ; round clock: frame, second, minute
+tsec:    !byte 0
+tmin:    !byte 0
 frame8:  !byte 0         ; framectr / 8: the animation beat
 ei:      !byte 0         ; enemy loop index
 etries:  !byte 0

@@ -11,6 +11,17 @@ win_init:
     +prtext 11, 15, WHITE, txt_welldone, txt_welldonee-txt_welldone
     +prtext 13, 10, LGREY, txt_beaten, txt_beatene-txt_beaten
 
+    ; the round time into the readout: "time: mm:ss"
+    lda tmin
+    jsr two_digits
+    stx txt_timev
+    sta txt_timev+1
+    lda tsec
+    jsr two_digits
+    stx txt_timev+3
+    sta txt_timev+4
+    +prtext 15, 14, CYAN, txt_time, txt_timee-txt_time
+
     lda #0
     sta washphase
     +setupd win_update
@@ -75,11 +86,26 @@ wu_input:
 wu_stay:
     rts
 
+two_digits:              ; A (0-99) -> X / A: two digit screen codes
+    ldx #$30
+td_tens:
+    cmp #10
+    bcc td_ones
+    sbc #10              ; carry is set here
+    inx
+    bne td_tens
+td_ones:
+    ora #$30
+    rts
+
 ; ---- win texts ----
 txt_escaped:  !scr "escaped"
 txt_welldone: !scr "well done!"
 txt_welldonee:
 txt_beaten:   !scr "you beat labyrintwo"
 txt_beatene:
+txt_time:     !scr "time: "
+txt_timev:    !scr "00:00"
+txt_timee:
 txt_firemenu: !scr "fire = menu"
 txt_firemenue:
