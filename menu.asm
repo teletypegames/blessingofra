@@ -1,26 +1,30 @@
 ; -----------------------------------------------------------
-; menu.asm - full-screen menu card: big LABYRINTWO title in
-; two colors (gold wash on LABYRIN, cool blue shimmer on
-; TWO), and a five-item menu: play / options / rules /
-; controls / credits (joystick or w/s up/down + fire, space
-; or return)
+; menu.asm - full-screen menu card: big BLESSING / OF RA
+; title under the rolling gold sun wash, and a four-item
+; menu: play / options / story / credits (joystick or w/s
+; up/down + fire, space or return)
 ; -----------------------------------------------------------
 
-MENU_ITEMS = 5
+MENU_ITEMS = 4
 
 menu_init:
     jsr clear_screen
 
     ; a dark maze weaves behind the whole card
-    lda #DGREY
+    lda #MAZE_CW
+    sta mzcw
+    lda #MAZE_CH
+    sta mzch
+    jsr set_maze
+    lda #BROWN
     sta latwcol
     sta latpcol
     jsr draw_lattice
     jsr gen_init
     jsr gen_maze_full
 
-    ; a clean panel for the menu itself (rows 9-22, cols 4-35)
-    ldx #9
+    ; a clean panel for the menu itself (rows 13-24, cols 4-35)
+    ldx #13
 mi_panel:
     stx ptmp
     jsr row_ptr
@@ -35,12 +39,12 @@ mi_pcol:
     bne mi_pcol
     ldx ptmp
     inx
-    cpx #23
+    cpx #25
     bne mi_panel
 
-    +prbig 2, 0, YELLOW, txt_t1, 7
-    +prbig 2, 28, CYAN, txt_t2, 3
-    +prtext 9, 13, LGREY, txt_ttgname, 14
+    +prbig 1, 4, YELLOW, txt_t1, 8
+    +prbig 7, 10, ORANGE, txt_t2, 5
+    +prtext 13, 13, LGREY, txt_ttgname, 14
 
     lda #0
     sta menusel
@@ -50,58 +54,7 @@ mi_pcol:
     rts
 
 menu_update:
-    ; the title rows 2-6: gold wash on LABYRIN (columns 0-26),
-    ; cool blue shimmer on TWO (columns 27-38)
-    inc washphase
-    lda #0
-    sta g8row
-mw_row:
-    lda #2
-    clc
-    adc g8row
-    tax
-    jsr row_ptr
-    lda washphase
-    lsr
-    clc
-    adc g8row
-    and #15
-    tax
-    lda washtbl,x
-    sta rtmp
-    ldy #26
-mw_col:
-    lda (scrlo),y
-    cmp #$a0             ; only touch the letter blocks
-    bne mw_skip
-    lda rtmp
-    sta (collo),y
-mw_skip:
-    dey
-    bpl mw_col
-    lda washphase
-    lsr
-    clc
-    adc g8row
-    and #7
-    tax
-    lda cooltbl,x
-    sta rtmp
-    ldy #38
-mw_col2:
-    lda (scrlo),y
-    cmp #$a0
-    bne mw_skip2
-    lda rtmp
-    sta (collo),y
-mw_skip2:
-    dey
-    cpy #26
-    bne mw_col2
-    inc g8row
-    lda g8row
-    cmp #5
-    bne mw_row
+    jsr wash_title       ; gold sun wash on both title lines
 
     ; joystick up/down steps the cursor (edge detected)
     jsr read_joy
@@ -135,8 +88,8 @@ mu_udrel:
 mu_udend:
 
     ; footer: both control lines always visible
-    +prtext 21, 8, LGREY, txt_info, txt_infoe-txt_info
-    +prtext 22, 5, LGREY, txt_info2, txt_info2e-txt_info2
+    +prtext 23, 7, LGREY, txt_info, txt_infoe-txt_info
+    +prtext 24, 11, LGREY, txt_info2, txt_info2e-txt_info2
 
     ; the menu items: the picked line is yellow
     ldx #0
@@ -152,11 +105,10 @@ mm_items:
 
     ; blinking '>' cursor in front of the picked line
     lda #$20
-    sta SCREEN+11*40+15
-    sta SCREEN+13*40+15
     sta SCREEN+15*40+15
     sta SCREEN+17*40+15
     sta SCREEN+19*40+15
+    sta SCREEN+21*40+15
     lda framectr
     and #16
     bne mu_start
@@ -186,18 +138,20 @@ mu_start:
     cmp #1
     beq mg_options
     cmp #2
-    beq mg_rules
-    cmp #3
-    beq mg_controls
+    beq mg_story
     +fadeto credits_init ; every screen change fades to black
 mg_play:
+    lda #MZMIN           ; a fresh run: level 1, clock zeroed
+    sta mzsize
+    lda #0
+    sta tframe
+    sta tsec
+    sta tmin
     +fadeto play_init
 mg_options:
     +fadeto options_init
-mg_rules:
-    +fadeto rules_init
-mg_controls:
-    +fadeto controls_init
+mg_story:
+    +fadeto story_init
 mu_done:
     rts
 
@@ -223,35 +177,27 @@ dm_store:
 
 ; ---- menu tables ----
 mitem_lo:
-    !byte <txt_play, <txt_options, <txt_rules
-    !byte <txt_controls, <txt_credits
+    !byte <txt_play, <txt_options, <txt_story, <txt_credits
 mitem_hi:
-    !byte >txt_play, >txt_options, >txt_rules
-    !byte >txt_controls, >txt_credits
-mitem_len: !byte 4, 7, 5, 8, 7
-mitem_row: !byte 11, 13, 15, 17, 19
+    !byte >txt_play, >txt_options, >txt_story, >txt_credits
+mitem_len: !byte 4, 7, 5, 7
+mitem_row: !byte 15, 17, 19, 21
 mcur_lo:                 ; cursor cells: column 15 of those rows
-    !byte <(SCREEN+11*40+15), <(SCREEN+13*40+15)
     !byte <(SCREEN+15*40+15), <(SCREEN+17*40+15)
-    !byte <(SCREEN+19*40+15)
+    !byte <(SCREEN+19*40+15), <(SCREEN+21*40+15)
 mcur_hi:
-    !byte >(SCREEN+11*40+15), >(SCREEN+13*40+15)
     !byte >(SCREEN+15*40+15), >(SCREEN+17*40+15)
-    !byte >(SCREEN+19*40+15)
-
-cooltbl:                 ; blue-cyan-white shimmer for the TWO
-    !byte $06, $0e, $03, $01, $01, $03, $0e, $06
+    !byte >(SCREEN+19*40+15), >(SCREEN+21*40+15)
 
 ; ---- menu texts ----
 txt_play:    !scr "play"
 txt_options: !scr "options"
-txt_rules:   !scr "rules"
 txt_credits: !scr "credits"
-txt_info:    !scr "p1: joy2 / wasd - runner"
+txt_info:    !scr "p1: joy2/wasd - the worker"
 txt_infoe:
-txt_info2:   !scr "p2: joy1 / ijkl - wall spinner"
+txt_info2:   !scr "p2: joy1/ijkl - ra"
 txt_info2e:
 
 ; ---- menu variables ----
-menusel:   !byte 0       ; picked line: 0-2
+menusel:   !byte 0       ; picked line: 0-3
 udheld:    !byte 0       ; joystick up/down edge detection state

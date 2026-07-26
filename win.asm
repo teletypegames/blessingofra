@@ -1,6 +1,6 @@
 ; -----------------------------------------------------------
-; win.asm - the escape screen: big ESCAPED with the gold
-; wash; fire returns to the main menu
+; win.asm - the escape screen after the last level: big
+; ESCAPED with the gold wash; fire returns to the main menu
 ; -----------------------------------------------------------
 
 win_init:
@@ -8,8 +8,8 @@ win_init:
 
     +prbig 3, 6, YELLOW, txt_escaped, 7
 
-    +prtext 11, 15, WHITE, txt_welldone, txt_welldonee-txt_welldone
-    +prtext 13, 10, LGREY, txt_beaten, txt_beatene-txt_beaten
+    +prtext 11, 10, WHITE, txt_welldone, txt_welldonee-txt_welldone
+    +prtext 13, 5, LGREY, txt_beaten, txt_beatene-txt_beaten
 
     ; the round time into the readout: "time: mm:ss"
     lda tmin
@@ -100,9 +100,9 @@ td_ones:
 
 ; ---- win texts ----
 txt_escaped:  !scr "escaped"
-txt_welldone: !scr "well done!"
+txt_welldone: !scr "ra smiles upon you!"
 txt_welldonee:
-txt_beaten:   !scr "you beat labyrintwo"
+txt_beaten:   !scr "you escaped the pyramid of ra"
 txt_beatene:
 txt_time:     !scr "time: "
 txt_timev:    !scr "00:00"

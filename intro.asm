@@ -2,7 +2,8 @@
 ; intro.asm - boot screen ported from rabbitc64: giant TTG
 ; letters built from 8x8 bitmaps with a gold color wash
 ; running down them, TELETYPE GAMES / PRESENTS below;
-; advances to the menu after a few seconds or on fire
+; advances to the pyramid title card after a few seconds or
+; on fire
 ; -----------------------------------------------------------
 
 INTRO_LROW = 3           ; top cell row of the giant letters
@@ -78,11 +79,11 @@ iw_skip:
     ; fire skips, otherwise wait out the timer
     jsr start_edge
     beq iw_tick
-    +fadeto menu_init
+    +fadeto pyramid_init
 iw_tick:
     dec introt
     bne iw_done
-    +fadeto menu_init
+    +fadeto pyramid_init
 iw_done:
     rts
 

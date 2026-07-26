@@ -1,6 +1,7 @@
 ; -----------------------------------------------------------
 ; over.asm - game over screen: big red GAME OVER, fire
-; restarts with a fresh maze, the m key backs out to the menu
+; retries the same level with a fresh maze, the m key backs
+; out to the menu
 ; -----------------------------------------------------------
 
 lose_init:
@@ -11,7 +12,14 @@ lose_init:
 
     +prbig 3, 2, RED, txt_gameover, 9
 
-    +prtext 11, 10, WHITE, txt_caught, txt_caughte-txt_caught
+    +prtext 11, 8, WHITE, txt_caught, txt_caughte-txt_caught
+
+    lda mzsize           ; which level claimed him
+    sec
+    sbc #MZMIN-1
+    ora #$30
+    sta txt_felld
+    +prtext 13, 10, LGREY, txt_fell, txt_felle-txt_fell
 
     +prtext 21, 13, LGREY, txt_mmenu, txt_mmenue-txt_mmenu
 
@@ -51,8 +59,11 @@ lu_done:
 
 ; ---- game over texts ----
 txt_gameover: !scr "game over"
-txt_caught:   !scr "the enemies got you"
+txt_caught:   !scr "the pyramid claimed you"
 txt_caughte:
+txt_fell:     !scr "you fell on level "
+txt_felld:    !scr "1"
+txt_felle:
 txt_retry:    !scr "fire = try again"
 txt_retrye:
 txt_mmenu:    !scr "m = main menu"

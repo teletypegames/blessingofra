@@ -1,11 +1,11 @@
 ; -----------------------------------------------------------
 ; gfx.asm - the graphics layer:
 ;   - the ROM font is copied into RAM and a handful of custom
-;     tiles are stamped over it (brick wall, pivot post, the
-;     animated exit portal, the 1/8-step cooldown bar cells)
+;     tiles are stamped over it (sandstone wall, pivot post,
+;     the animated exit portal, the 1/8-step cooldown bar)
 ;   - a small sprite engine: every actor lives on the char
 ;     grid, its sprite glides toward the cell a few pixels a
-;     frame (the runner bobs, the enemies wave)
+;     frame (the worker bobs, the enemies wave)
 ;   - fade to black: the transition between two screens
 ; -----------------------------------------------------------
 
@@ -308,7 +308,7 @@ fadetbl:                 ; each color, one step darker
     !byte $02, $00, $02, $00, $0b, $05, $06, $0c
 
 ; ---- the custom tiles ----
-tile_gfx:                ; CH_WALL: bricks with dark mortar
+tile_gfx:                ; CH_WALL: sandstone blocks, dark mortar
     !byte %11111111
     !byte %11110111
     !byte %11110111
@@ -430,52 +430,63 @@ spr_cur0:                ; the corner cursor: four brackets
     !byte %10000001, 0, 0
     !byte %11100111, 0, 0
     !fill 40, 0
-spr_ena0:                ; enemies 0-1: a ghost, skirt waving
-    !byte %00111100, 0, 0
-    !byte %01111110, 0, 0
-    !byte %11011011, 0, 0
-    !byte %11011011, 0, 0
-    !byte %11111111, 0, 0
-    !byte %11111111, 0, 0
-    !byte %11111111, 0, 0
-    !byte %10110101, 0, 0
-    !fill 40, 0
-spr_ena1:
-    !byte %00111100, 0, 0
-    !byte %01111110, 0, 0
-    !byte %11011011, 0, 0
-    !byte %11011011, 0, 0
-    !byte %11111111, 0, 0
-    !byte %11111111, 0, 0
-    !byte %11111111, 0, 0
-    !byte %01101101, 0, 0
-    !fill 40, 0
-spr_enb0:                ; enemies 2-3: a crawler, legs pumping
+spr_sting0:              ; the scorpion's venom sting: a drop
     !byte %00000000, 0, 0
+    !byte %00011000, 0, 0
+    !byte %00111100, 0, 0
+    !byte %01111110, 0, 0
+    !byte %00111100, 0, 0
+    !byte %00011000, 0, 0
+    !byte %00000000, 0, 0
+    !byte %00000000, 0, 0
+    !fill 40, 0
+spr_ena0:                ; even enemies: a scarab, legs out...
+    !byte %00100100, 0, 0
     !byte %10111101, 0, 0
     !byte %01111110, 0, 0
     !byte %11011011, 0, 0
-    !byte %01111110, 0, 0
-    !byte %10111101, 0, 0
-    !byte %00000000, 0, 0
-    !byte %00000000, 0, 0
-    !fill 40, 0
-spr_enb1:
-    !byte %00000000, 0, 0
-    !byte %00111100, 0, 0
-    !byte %01111110, 0, 0
     !byte %11011011, 0, 0
     !byte %01111110, 0, 0
+    !byte %10111101, 0, 0
+    !byte %00100100, 0, 0
+    !fill 40, 0
+spr_ena1:                ; ...and tucked as it scuttles
+    !byte %00100100, 0, 0
     !byte %00111100, 0, 0
-    !byte %00000000, 0, 0
-    !byte %00000000, 0, 0
+    !byte %11111111, 0, 0
+    !byte %01011010, 0, 0
+    !byte %01011010, 0, 0
+    !byte %11111111, 0, 0
+    !byte %00111100, 0, 0
+    !byte %00100100, 0, 0
+    !fill 40, 0
+spr_enb0:                ; odd enemies: a scorpion, claws up,
+    !byte %11000011, 0, 0    ; the tail swinging right...
+    !byte %01100110, 0, 0
+    !byte %00111100, 0, 0
+    !byte %01111110, 0, 0
+    !byte %00111100, 0, 0
+    !byte %00011000, 0, 0
+    !byte %00001100, 0, 0
+    !byte %00011110, 0, 0
+    !fill 40, 0
+spr_enb1:                ; ...and left
+    !byte %11000011, 0, 0
+    !byte %01100110, 0, 0
+    !byte %00111100, 0, 0
+    !byte %01111110, 0, 0
+    !byte %00111100, 0, 0
+    !byte %00011000, 0, 0
+    !byte %00110000, 0, 0
+    !byte %01111000, 0, 0
     !fill 40, 0
 
-SPR_RUN  = spr_run0 DIV 64
-SPR_SHOT = spr_shot0 DIV 64
-SPR_CUR  = spr_cur0 DIV 64
-SPR_ENA  = spr_ena0 DIV 64
-SPR_ENB  = spr_enb0 DIV 64
+SPR_RUN   = spr_run0 DIV 64
+SPR_SHOT  = spr_shot0 DIV 64
+SPR_CUR   = spr_cur0 DIV 64
+SPR_STING = spr_sting0 DIV 64
+SPR_ENA   = spr_ena0 DIV 64
+SPR_ENB   = spr_enb0 DIV 64
 
 !if spr_run0 < $2000 { !error "sprite data slid under $2000: the VIC sees the char ROM shadow there" }
 !if * > CHARSET { !error "the program ran into the charset at $3800" }

@@ -2,7 +2,7 @@
 # Makefile – C64 project builder (ACME + VICE)
 # -----------------------------------------
 
-PROJECT = labyrintwo
+PROJECT = blessingofra
 
 ASM    = acme
 EMU    = x64sc

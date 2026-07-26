@@ -45,7 +45,7 @@ SFX_ROTATE = 2           ; wall spin: noise whoosh
 SFX_DENY   = 3           ; blocked spin: low buzz
 SFX_WIN    = 4           ; escape: rising jingle
 SFX_LOSE   = 5           ; caught: descending sweep
-SFX_SHOT   = 6           ; gun fired: short high tick
+SFX_SHOT   = 6           ; gun / scorpion sting: short high tick
 SFX_HIT    = 7           ; enemy hit: noise burst
 NSFX       = 8
 
@@ -75,34 +75,45 @@ JOY_RIGHT = 8
 JOY_FIRE  = 16
 
 ; ---- the maze ----
-; 19x11 cells on a 39x23 char lattice (screen rows 1-23):
-;   cell  = odd column,  even row  (walkable)
-;   post  = even column, odd row   (pivot, always solid)
+; a lattice of (2*cells+1) chars per side, centered on rows
+; 1-23; local coordinates inside the lattice:
+;   cell  = odd column,  odd row   (walkable)
+;   post  = even column, even row  (pivot, always solid)
 ;   slot  = the rest: wall pieces that spin around the posts
 ; wall thickness therefore equals corridor width: one cell
-MAZE_CW  = 19            ; cells across
-MAZE_CH  = 11            ; cells down
+; the levels are squares, one cell bigger each level: MZMIN
+; up to MZMAX (11x11 cells = 23x23 chars, the tallest square
+; the screen fits); the menu backdrop uses the full lattice
+MZMIN    = 4             ; level 1: 4x4 cells
+MZMAX    = 11            ; level 8: 11x11 cells
+MAZE_CW  = 19            ; the largest lattice: the menu backdrop
+MAZE_CH  = 11
 NCELLS   = MAZE_CW * MAZE_CH
-NENEMIES = 4
+NENEMIES = 4             ; enemy sprite slots (a level uses 1-4)
 
 ; ---- characters (the custom tiles live in the RAM charset) ----
-CH_WALL   = $e0          ; brick block: spinnable wall piece
+CH_WALL   = $e0          ; sandstone block: spinnable wall piece
 CH_POST   = $e1          ; bolted plate: fixed pivot post
 CH_EXIT   = $e2          ; the portal out (4 animated glyph frames)
 CH_FLOOR  = $20          ; space: corridor
 CH_BAR    = $e3          ; 7 chars: a bar cell 1-7 pixels full
 
 ; ---- the actors are hardware sprites ----
-SP_RUN  = 0              ; player 1, the runner
-SP_CUR  = 1              ; player 2, the corner cursor
-SP_SHOT = 2              ; the optional bullet
-SP_EN   = 3              ; the enemies ride sprites 3-6
+SP_RUN   = 0             ; player 1, the worker
+SP_CUR   = 1             ; player 2, ra's cursor
+SP_SHOT  = 2             ; the optional bullet
+SP_EN    = 3             ; the enemies ride sprites 3-6
+SP_STING = 7             ; the scorpions' venom sting
 
-COL_WALL = MGREY         ; spinnable wall pieces
-COL_POST = DGREY         ; fixed pivot posts
+; ---- desert palette ----
+COL_WALL = ORANGE        ; sandstone wall pieces
+COL_POST = BROWN         ; fixed pivot posts
 COL_EXIT = LGREEN        ; the exit portal
 COL_HILITE = YELLOW      ; walls the cursor's spin would move
-STATCOL  = BLUE          ; background band behind the status row
+COL_SCARAB = CYAN        ; the scarabs
+COL_SCORP  = LRED        ; the scorpions
+COL_STING  = PURPLE      ; the venom sting
+STATCOL  = BROWN         ; background band behind the status row
 
 ; ---- game timing ----
 REP_HOLD    = 10         ; runner: frames before a held dir repeats

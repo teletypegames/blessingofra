@@ -356,10 +356,48 @@ bigmap:                  ; screen code (a=1..z=26) -> glyph index
     !byte  0,  7,  8,  9, 10, 11,  0, 12, 13, 14   ; k-t
     !byte 20, 18, 21,  0, 15,  0                   ; u-z
 
+; ---- gold wash over the two big title lines (rows 1-5 and
+; 7-11): only the $a0 letter blocks are recolored, so it is
+; safe over any backdrop ----
+wash_title:
+    inc washphase
+    lda #0
+    sta g8row
+wt_row:
+    ldx g8row
+    lda wtrows,x
+    tax
+    jsr row_ptr
+    lda washphase
+    lsr                  ; half speed keeps the shimmer gentle
+    clc
+    adc g8row
+    and #15
+    tax
+    lda washtbl,x
+    sta rtmp
+    ldy #39
+wt_col:
+    lda (scrlo),y
+    cmp #$a0             ; only touch the letter blocks
+    bne wt_skip
+    lda rtmp
+    sta (collo),y
+wt_skip:
+    dey
+    bpl wt_col
+    inc g8row
+    lda g8row
+    cmp #10
+    bne wt_row
+    rts
+
+wtrows: !byte 1, 2, 3, 4, 5, 7, 8, 9, 10, 11
+
 ; ---- shared texts (screen codes) ----
-; the title is split so the two words can wear two colors
-txt_t1:      !scr "labyrin"
-txt_t2:      !scr "two"
+; the title is split so the two lines can be placed apart
+txt_t1:      !scr "blessing"
+txt_t2:      !scr "of ra"
 txt_ttgname: !scr "teletype games"
 txt_presents:!scr "presents"
 txt_return:  !scr "fire = return"

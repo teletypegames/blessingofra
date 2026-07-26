@@ -1,9 +1,9 @@
 {
-  "name": "labyrintwo",
-  "title": "LabyrinTwo",
+  "name": "blessingofra",
+  "title": "Blessing of Ra",
   "author": "Teletype Games",
-  "desc": "Two-player maze duel: one player runs for the exit while the other spins the walls of the labyrintwo around their corners. Dodge the enemies, find the diamond.",
+  "desc": "Two-player pyramid escape: a worker sealed in the great pyramid runs for the exit while Ra bends the maze walls around him. Scarabs and scorpions - and their flying venom stings - hunt him through eight levels, from a 4x4 maze up to 11x11.",
   "site": "https://git.teletype.hu/games/labyrintwo",
   "license": "MIT",
-  "version": "1.0.0"
+  "version": "2.0.0"
 }

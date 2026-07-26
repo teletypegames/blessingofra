@@ -1,51 +1,65 @@
-# labyrintwo (LabyrinTwo)
+# Blessing of Ra
 
-**LabyrinTwo** - a two-player maze duel for the Commodore 64
+**Blessing of Ra** - a two-player pyramid escape for the Commodore 64
 (ACME + VICE), in the same spirit as [rabbitc64](../rabbitc64).
 
-A fresh maze carves itself on screen at the start of every round on
-a 39x23 lattice where the walls are exactly as wide as the corridors.
-**Player 1** (joystick 2, or `w a s d`) runs the corridors toward the
-green exit portal while dodging the roaming enemies. **Player 2**
-(joystick 1, or `i j k l`) rides the corners of the walls with a
-bracket cursor - fire (or `return`) spins the four wall pieces around
-the cursor by 90 degrees, reshaping the maze in real time. A spin is
-denied while anyone is standing in one of the four slots (the border
-blips red); the spun pieces flash white.
+The legend: when the great pyramid rose, a worker was sealed in its
+peak. He prayed to Ra until the sun god took pity - now Ra bends the
+pyramid's labyrinth walls to lead him out.
 
-The look: brick walls and bolted pivot posts from a custom RAM
-charset, every actor (runner, cursor, bullet, enemies) a hardware
-sprite gliding smoothly between the cells, an animated exit portal,
-a raster color band behind the status row, and a fade to black
-between all screens. The menu floats over a dark maze backdrop.
+**Player 1** (joystick 2, or `w a s d`) is the worker, running the
+corridors toward the green exit portal. **Player 2** (joystick 1, or
+`i j k l`) is Ra: a bracket cursor rides the corners of the walls -
+fire (or `return`) spins the four wall pieces around the cursor by
+90 degrees, reshaping the maze in real time. A spin is denied while
+anyone is standing in one of the four slots (the border blips red);
+the spun pieces flash white.
+
+Eight levels, each maze one cell bigger than the last: a square that
+starts at 4x4 cells and grows to 11x11 - the tallest square lattice
+the screen fits - always centered on screen. One more enemy joins
+each level (up to four): the cyan **scarabs** roam the corridors,
+and the light-red **scorpions** also spit a venom sting whenever
+they line up with the worker - the purple drop flies down the
+corridor until a wall swallows it.
+
+The look: a desert palette of sandstone walls and brown pivot posts
+from a custom RAM charset, every actor (worker, cursor, bullet,
+sting, enemies) a hardware sprite gliding smoothly between the
+cells, an animated exit portal, a raster color band behind the
+status row, and a fade to black between all screens. The menu floats
+over a dark maze backdrop under the big gold-washed title.
 
 The options screen adds two optional twists:
 
-- **runner gun** - player 1 shoots a bullet with fire/`space`; a hit
+- **worker gun** - player 1 shoots a bullet with fire/`space`; a hit
   enemy respawns on a random cell after a pause.
 - **spin cooldown** - each spin starts a recharge; further spins are
   denied until the bar on the status row drains (pixel by pixel) and
   the readout flips back from *wait* to *ready* (the cursor also
   turns red while recharging).
 
-Screens: TTG intro (ported from rabbitc64) -> main menu
-(play / options / rules / controls / credits) -> game -> win (back
-to the menu) or game over (fire retries with a fresh maze, `m` backs
-out to the menu).
+Screens: TTG intro (ported from rabbitc64) -> pyramid title card
+(the pyramid, the trapped worker and the pulsing sun of Ra) -> main
+menu (play / options / story / credits) -> game -> next level, and
+after the last one the escape screen (back to the menu); game over
+lets fire retry the same level with a fresh maze, `m` backs out to
+the menu. The story screen tells the legend and lists who steers
+what.
 
 ## Build & run
 
 ```
 make deps       # macOS: brew install acme vice
-make build      # -> labyrintwo.prg
+make build      # -> blessingofra.prg
 make run        # build + launch in x64sc
 ```
 
 Test builds can boot straight into one state:
 
 ```
-acme -DAUTOPLAY=1 -f cbm -o labyrintwo.prg main.asm
-# also: AUTOOPTIONS, AUTORULES, AUTOCONTROLS, AUTOCREDITS,
+acme -DAUTOPLAY=1 -f cbm -o blessingofra.prg main.asm
+# also: AUTOOPTIONS, AUTOSTORY, AUTOPYRAMID, AUTOCREDITS,
 # AUTOWIN, AUTOLOSE; add -DFORCEOPTS=1 to start with both
 # options turned on
 ```
@@ -56,15 +70,16 @@ acme -DAUTOPLAY=1 -f cbm -o labyrintwo.prg main.asm
   the border/status-band raster work
 - `defs.asm` - registers, constants, zero page, macros
 - `intro.asm` - TTG boot logo with the gold color wash
+- `pyramid.asm` - title card: the pyramid, the worker, the sun of Ra
 - `menu.asm` - main menu card over a dark maze backdrop
 - `options.asm` - the optional extras and their toggle screen
-- `rules.asm` - how to play
-- `controls.asm` - joystick + keyboard mappings
+- `story.asm` - the legend of the worker and Ra + the controls
 - `credits.asm` - the crew
-- `play.asm` - maze generation (recursive backtracker, animated)
-  + the game
+- `play.asm` - maze geometry + generation (recursive backtracker,
+  animated) + the game and its eight growing levels
 - `win.asm` / `over.asm` - end screens
-- `common.asm` - shared routines: printing, big block font, input, RNG
+- `common.asm` - shared routines: printing, big block font, the
+  title wash, input, RNG
 - `sound.asm` - single-voice SID SFX driver
 - `gfx.asm` - RAM charset with the custom tiles, the sprite engine,
   the portal animation and the fade-to-black transition

@@ -1,10 +1,10 @@
 ; -----------------------------------------------------------
 ; options.asm - optional extras, toggled with fire:
-;   runner gun    - player 1 shoots with fire; a hit enemy
+;   worker gun    - player 1 shoots with fire; a hit enemy
 ;                   respawns elsewhere after a pause
-;   spin cooldown - the wall spinner needs a recharge between
-;                   two spins, shown on the status row
-; the settings live here and survive between rounds
+;   spin cooldown - ra needs a recharge between two spins,
+;                   shown on the status row
+; the settings live here and survive between levels
 ; -----------------------------------------------------------
 
 OPT_ITEMS = 3
@@ -173,7 +173,7 @@ ovtx_hi:   !byte >txt_off, >txt_on
 ovcol:     !byte LGREY, LGREEN
 
 ; ---- option texts ----
-txt_ogun:  !scr "runner gun"
+txt_ogun:  !scr "worker gun"
 txt_ocool: !scr "spin cooldown"
 txt_oback: !scr "back"
 txt_on:    !scr "on "
@@ -188,7 +188,7 @@ txt_oh2e:
 opt_shoot: !byte 1
 opt_cool:  !byte 1
 } else {
-opt_shoot: !byte 0       ; 0 = classic game, 1 = the runner shoots
+opt_shoot: !byte 0       ; 0 = classic game, 1 = the worker shoots
 opt_cool:  !byte 0       ; 1 = spins need a recharge
 }
 optsel:    !byte 0       ; picked line: 0-2

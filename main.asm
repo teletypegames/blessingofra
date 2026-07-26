@@ -1,18 +1,21 @@
 ; -----------------------------------------------------------
-; main.asm - LABYRINTWO for the C64
-;   two-player maze duel: player 1 runs the corridors toward
-;   the green exit portal while dodging the roaming colored
-;   enemies; player 2 rides the wall corners with a cursor
-;   and fire spins the four wall pieces around it by 90
-;   degrees, reshaping the maze under the runner's feet
+; main.asm - BLESSING OF RA for the C64
+;   two-player pyramid escape: player 1 is a worker sealed in
+;   the great pyramid, running the corridors toward the exit
+;   portal while dodging the scarabs and scorpions (whose
+;   venom stings fly down the corridors); player 2 is ra: the
+;   cursor rides the wall corners and fire spins the four
+;   wall pieces around it by 90 degrees, reshaping the maze
+;   under the worker's feet; eight levels, each maze one cell
+;   bigger than the last (4x4 up to 11x11)
 ;
 ; Files:
 ;   defs.asm    - constants, zero page, macros
 ;   intro.asm   - TTG boot logo (ported from rabbitc64)
+;   pyramid.asm - title card: the pyramid and the sun of ra
 ;   menu.asm    - main menu over a dark maze backdrop
-;   options.asm - optional extras: runner gun, spin cooldown
-;   rules.asm   - how to play
-;   controls.asm- joystick + keyboard mappings
+;   options.asm - optional extras: worker gun, spin cooldown
+;   story.asm   - the legend + who steers what
 ;   credits.asm - the crew (content from rabbitc64, new look)
 ;   play.asm    - maze generation + the game itself
 ;   win.asm     - escape screen, returns to the menu
@@ -21,7 +24,7 @@
 ;   sound.asm   - single-voice SFX driver
 ;   gfx.asm     - RAM charset, sprite engine, fades
 ;
-; Build: acme -f cbm -o labyrintwo.prg main.asm
+; Build: acme -f cbm -o blessingofra.prg main.asm
 ; -----------------------------------------------------------
 
 * = $0801
@@ -54,11 +57,11 @@ start:
 !ifdef AUTOPLAY {        ; test builds boot straight into one state
     jsr play_init
 } else {
-!ifdef AUTORULES {
-    jsr rules_init
+!ifdef AUTOSTORY {
+    jsr story_init
 } else {
-!ifdef AUTOCONTROLS {
-    jsr controls_init
+!ifdef AUTOPYRAMID {
+    jsr pyramid_init
 } else {
 !ifdef AUTOOPTIONS {
     jsr options_init
@@ -72,7 +75,7 @@ start:
 !ifdef AUTOLOSE {
     jsr lose_init
 } else {
-    jsr intro_init       ; TTG logo, then the menu
+    jsr intro_init       ; TTG logo, then the pyramid, then the menu
 }
 }
 }
@@ -145,10 +148,10 @@ wf_hit:
 ; the states and everything they share
 ; ============================================================
 !src "intro.asm"
+!src "pyramid.asm"
 !src "menu.asm"
 !src "options.asm"
-!src "rules.asm"
-!src "controls.asm"
+!src "story.asm"
 !src "credits.asm"
 !src "play.asm"
 !src "win.asm"

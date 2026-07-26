@@ -1,15 +1,20 @@
 ; -----------------------------------------------------------
-; play.asm - the game: a fresh maze carves itself on screen
-; every round (recursive backtracker, a few steps a frame),
-; player 1 (joystick 2) runs the corridors toward the exit
-; portal, player 2 (joystick 1) rides the wall corners and
-; fire spins the four wall pieces around the cursor by 90
-; degrees; the roaming enemies end the round on touch
+; play.asm - the game: eight levels of pyramid maze, each one
+; cell bigger than the last (4x4 up to 11x11, always square,
+; centered on screen); a fresh maze carves itself at the
+; start of every level (recursive backtracker, a few steps a
+; frame), player 1 (joystick 2) is the trapped worker running
+; for the exit, player 2 (joystick 1) is ra: the cursor rides
+; the wall corners and fire spins the four wall pieces around
+; it by 90 degrees; scarabs roam the corridors on the
+; worker's life, and the scorpions also spit venom stings
+; down them
 ;
 ; the walls, posts and the portal are chars (the screen stays
-; the wall data structure), but every actor - runner, cursor,
-; bullet, enemies - is a hardware sprite gliding between the
-; cells; actor collisions are grid coordinate checks
+; the wall data structure), but every actor - worker, cursor,
+; bullet, enemies, sting - is a hardware sprite gliding
+; between the cells; actor collisions are grid coordinate
+; checks
 ;
 ; optional extras (see options.asm):
 ;   opt_shoot - player 1's fire shoots a bullet in the last
@@ -19,15 +24,34 @@
 ;               a draining 1/8-step bar on the status row
 ;
 ; screen layout: status on row 0 (over the colored raster
-; band), the 39x23 maze lattice on rows 1-23, hints on row 24
+; band), the centered lattice on rows 1-23, hints on row 24
 ; -----------------------------------------------------------
 
 play_init:
     jsr clear_screen
-    +prtext 0, 0, WHITE, txt_t1, 7
-    +prtext 0, 7, CYAN, txt_t2, 3
+    +prtext 0, 0, WHITE, txt_level, 5
+    lda mzsize           ; level number 1-8 next to the label
+    sec
+    sbc #MZMIN-1
+    ora #$30
+    sta SCREEN+6
+    lda #YELLOW
+    sta COLRAM+6
     +prtext 0, 34, LGREY, txt_goal, txt_goale-txt_goal
-    +prtext 24, 6, DGREY, txt_hint, txt_hinte-txt_hint
+    +prtext 24, 4, DGREY, txt_hint, txt_hinte-txt_hint
+
+    lda mzsize           ; this level's lattice: a square
+    sta mzcw
+    sta mzch
+    jsr set_maze
+    lda mzsize           ; one more enemy each level, capped
+    sec
+    sbc #MZMIN-1
+    cmp #NENEMIES
+    bcc pi_ne
+    lda #NENEMIES
+pi_ne:
+    sta nenem
 
     lda #COL_WALL
     sta latwcol
@@ -60,26 +84,31 @@ play_start:
 ps_exit:
     jsr rand8
     and #$0f
-    cmp #MAZE_CH
+    cmp mzch
     bcs ps_exit
-    asl                  ; cell row -> screen row
-    clc
-    adc #2
+    asl                  ; cell row -> screen row (offy + 2*cy + 1)
+    sec
+    adc offy
     sta exrow
     tax
     jsr row_ptr
-    ldy #38
+    ldy excol
     lda #CH_EXIT
     sta (scrlo),y
     lda #COL_EXIT
     sta (collo),y
 
-    ; the runner starts in the top-left cell, facing right
-    lda #1
+    ; the worker starts in the top-left cell, facing right
+    lda offx
+    clc
+    adc #1
     sta px
-    sta fdx
-    lda #2
+    lda offy
+    clc
+    adc #1
     sta py
+    lda #1
+    sta fdx
     lda #0
     sta fdy
     lda px
@@ -90,10 +119,18 @@ ps_exit:
     ldx #SP_RUN
     jsr spr_jump
 
-    ; the corner cursor starts on the center post
-    lda #18
+    ; ra's cursor starts on the center post
+    lda mzcw
+    lsr
+    asl
+    clc
+    adc offx
     sta kx
-    lda #11
+    lda mzch
+    lsr
+    asl
+    clc
+    adc offy
     sta ky
     lda #COL_HILITE
     jsr mark_slots
@@ -107,9 +144,11 @@ ps_exit:
 
     lda #WHITE
     sta SPRCOL+SP_RUN
-    sta SPRCOL+SP_CUR
-    lda #YELLOW
     sta SPRCOL+SP_SHOT
+    lda #COL_HILITE      ; ra wears the sun's color
+    sta SPRCOL+SP_CUR
+    lda #COL_STING
+    sta SPRCOL+SP_STING
 
     jsr spawn_enemies
 
@@ -122,11 +161,9 @@ ps_exit:
     sta s_on
     sta sx
     sta sy
+    sta es_on
     sta cool
     sta rotflash
-    sta tframe           ; the clock starts when the maze is done
-    sta tsec
-    sta tmin
     lda #1
     sta cfheld
     sta rfheld
@@ -134,34 +171,101 @@ ps_exit:
     jmp upd_sprites      ; positions, shapes and enables now
 
 ; ============================================================
-; maze generation - recursive backtracker over the 19x11
-; cells; the screen itself is the wall data structure
+; maze geometry - the lattice is sized and placed from the
+; cell counts in mzcw / mzch (the levels are squares, the
+; menu backdrop is the full 19x11)
 ; ============================================================
 
-; fill rows 1-23 of the lattice: brick walls in latwcol, the
-; pivot posts (even col, odd row) in latpcol
+; from mzcw/mzch: screen offsets, the exit column, the
+; visited-index multiply table, ra's post bounds and the
+; enemies' spawn half
+set_maze:
+    lda #19              ; offx = (39 - (2*cw+1)) / 2 = 19 - cw
+    sec
+    sbc mzcw
+    sta offx
+    lda #12              ; rows 1-23: offy = 12 - ch
+    sec
+    sbc mzch
+    sta offy
+    lda #0               ; multab[i] = i * mzcw
+    tax
+sm_mul:
+    sta multab,x
+    clc
+    adc mzcw
+    inx
+    cpx #MZMAX
+    bne sm_mul
+    lda mzcw             ; the right border column holds the exit
+    asl
+    clc
+    adc offx
+    sta excol
+    sec                  ; interior posts: offx+2 .. offx+2*cw-2
+    sbc #2
+    sta kmaxx
+    lda offx
+    clc
+    adc #2
+    sta kminx
+    lda mzch
+    asl
+    clc
+    adc offy
+    sec
+    sbc #2
+    sta kmaxy
+    lda offy
+    clc
+    adc #2
+    sta kminy
+    lda mzcw             ; enemies spawn on the right half
+    lsr
+    sta enhalf
+    rts
+
+; fill the lattice with sandstone in latwcol, the pivot posts
+; (even local column and row) in latpcol
 draw_lattice:
-    ldx #1
+    lda offy
+    sta ptmp
 dl_fill:
-    stx ptmp
+    ldx ptmp
     jsr row_ptr
-    ldy #38
+    lda mzcw
+    asl
+    sta lcnt
+    inc lcnt             ; 2*cw+1 chars per lattice row
+    ldy offx
 dl_col:
     lda #CH_WALL
     sta (scrlo),y
     lda latwcol
     sta (collo),y
-    dey
-    bpl dl_col
-    ldx ptmp
-    inx
-    cpx #24
-    bne dl_fill
-    ldx #1               ; post rows 1, 3, ... 23
+    iny
+    dec lcnt
+    bne dl_col
+    inc ptmp
+    lda mzch
+    asl
+    clc
+    adc offy             ; the bottom lattice row
+    cmp ptmp
+    bcs dl_fill
+    lda offy             ; post rows: offy, offy+2, ...
+    sta ptmp
 dl_prow:
-    stx ptmp
+    ldx ptmp
     jsr row_ptr
-    ldy #38              ; post columns 38, 36, ... 0
+    lda mzcw
+    asl
+    clc
+    adc offx
+    tay                  ; post columns from the right edge down
+    lda mzcw
+    sta lcnt
+    inc lcnt             ; cw+1 posts per post row
 dl_pcol:
     lda #CH_POST
     sta (scrlo),y
@@ -169,13 +273,22 @@ dl_pcol:
     sta (collo),y
     dey
     dey
-    bpl dl_pcol
-    ldx ptmp
-    inx
-    inx
-    cpx #25
-    bcc dl_prow
+    dec lcnt
+    bne dl_pcol
+    inc ptmp
+    inc ptmp
+    lda mzch
+    asl
+    clc
+    adc offy
+    cmp ptmp
+    bcs dl_prow
     rts
+
+; ============================================================
+; maze generation - recursive backtracker over the cells;
+; the screen itself is the wall data structure
+; ============================================================
 
 ; reset the generator: nothing visited, start on cell (0,0)
 gen_init:
@@ -206,17 +319,17 @@ gm_scan:
     clc
     adc dxtab,x
     sta gnx
-    cmp #MAZE_CW         ; unsigned: -1 wraps to $ff and fails too
+    cmp mzcw             ; unsigned: -1 wraps to $ff and fails too
     bcs gm_next
     ldx gtd
     lda gcy
     clc
     adc dytab,x
     sta gny
-    cmp #MAZE_CH
+    cmp mzch
     bcs gm_next
     ldx gny
-    lda mul19,x
+    lda multab,x
     clc
     adc gnx
     tax
@@ -285,9 +398,9 @@ gen_maze_full:           ; the menu backdrop wants it all at once
     bcc gen_maze_full
     rts
 
-gv_mark:                 ; visited[gcy * 19 + gcx] = 1
+gv_mark:                 ; visited[gcy * mzcw + gcx] = 1
     ldx gcy
-    lda mul19,x
+    lda multab,x
     clc
     adc gcx
     tax
@@ -295,17 +408,17 @@ gv_mark:                 ; visited[gcy * 19 + gcx] = 1
     sta visited,x
     rts
 
-carve_cell:              ; open the cell (2*gcx+1, 2*gcy+2)
+carve_cell:              ; open the cell at (offx+2*gcx+1, offy+2*gcy+1)
     lda gcy
     asl
-    clc
-    adc #2
+    sec
+    adc offy
     tax
     jsr row_ptr
     lda gcx
     asl
-    clc
-    adc #1
+    sec
+    adc offx
     tay
     lda #CH_FLOOR
     sta (scrlo),y
@@ -317,8 +430,8 @@ carve_wall:              ; open the wall slot toward direction gtd
     ldx gtd
     lda gcy
     asl
-    clc
-    adc #2
+    sec
+    adc offy
     clc
     adc dytab,x
     tax
@@ -326,8 +439,8 @@ carve_wall:              ; open the wall slot toward direction gtd
     ldx gtd
     lda gcx
     asl
-    clc
-    adc #1
+    sec
+    adc offx
     clc
     adc dxtab,x
     tay
@@ -339,9 +452,9 @@ carve_wall:              ; open the wall slot toward direction gtd
 
 dxtab: !byte 0, 0, $ff, 1        ; up, down, left, right
 dytab: !byte $ff, 1, 0, 0
-mul19: !byte 0, 19, 38, 57, 76, 95, 114, 133, 152, 171, 190
 
-; ---- enemies: random colors, random right-half cells ----
+; ---- enemies: even index = scarab, odd = scorpion; random
+; right-half cells, away from the worker's start ----
 spawn_enemies:
     lda #0
     sta ei
@@ -349,7 +462,7 @@ sn_all:
     jsr spawn_one
     inc ei
     lda ei
-    cmp #NENEMIES
+    cmp nenem
     bne sn_all
     rts
 
@@ -357,22 +470,22 @@ spawn_one:               ; place enemy ei on a random free cell
 sn_rx:
     jsr rand8
     and #$0f
-    cmp #MAZE_CH
+    cmp mzcw
     bcs sn_rx
-    clc
-    adc #MAZE_CW-MAZE_CH ; cell column 8-18: away from the start
+    cmp enhalf           ; keep to the right half
+    bcc sn_rx
     asl
-    clc
-    adc #1
-    sta ttx              ; candidate screen column
+    sec
+    adc offx             ; cell column -> screen column
+    sta ttx
 sn_ry:
     jsr rand8
     and #$0f
-    cmp #MAZE_CH
+    cmp mzch
     bcs sn_ry
     asl
-    clc
-    adc #2
+    sec
+    adc offy
     sta tty              ; candidate screen row
     ldx tty
     jsr row_ptr
@@ -380,7 +493,7 @@ sn_ry:
     lda (scrlo),y
     cmp #CH_FLOOR        ; only a carved cell will do...
     bne sn_rx
-    lda ttx              ; ...without the runner on it...
+    lda ttx              ; ...without the worker on it...
     cmp px
     bne sn_free
     lda tty
@@ -394,11 +507,10 @@ sn_free:
     sta ex,x
     lda tty
     sta ey,x
-    jsr rand8
-    and #7
+    lda ei
+    and #1               ; the type wears its own color
     tay
-    lda ecoltab,y
-    sta ecol,x
+    lda etypecol,y
     sta SPRCOL+SP_EN,x
     jsr rand8
     and #3
@@ -416,14 +528,13 @@ sn_free:
     tax
     jmp spr_jump
 
-ecoltab:                 ; anything but the white runner / grey walls
-    !byte RED, CYAN, PURPLE, YELLOW, ORANGE, LRED, LBLUE, BLUE
+etypecol: !byte COL_SCARAB, COL_SCORP
 
 ; ============================================================
 ; one frame of play
 ; ============================================================
 play_update:
-    inc tframe           ; the round clock: 50 frames = one second
+    inc tframe           ; the run clock: 50 frames = one second
     lda tframe
     cmp #50
     bne pu_clock
@@ -453,6 +564,9 @@ pu_nocool:
     jsr upd_enemies
     lda endflag
     bne pu_end
+    jsr upd_sting
+    lda endflag
+    bne pu_end
     jsr upd_cursor
     jsr upd_flash
     jsr upd_status
@@ -467,6 +581,12 @@ pu_end:
 pu_win:
     lda #SFX_WIN
     jsr sfx_play
+    lda mzsize           ; the last level won: the blessing is earned
+    cmp #MZMAX
+    bcs pw_final
+    inc mzsize           ; otherwise the next maze is one cell bigger
+    +fadeto play_init
+pw_final:
     +fadeto win_init
 
 ; ---- player 1: walk the corridors, one cell per step ----
@@ -543,6 +663,15 @@ ur_try:
     bne ur_stop          ; a wall or a post: blocked
     jsr enemy_at         ; walking into an enemy still hurts
     bcs ur_dead
+    lda es_on            ; and so does the venom sting
+    beq ur_go
+    lda ttx
+    cmp esx
+    bne ur_go
+    lda tty
+    cmp esy
+    beq ur_dead
+ur_go:
     lda ttx
     sta px
     lda tty
@@ -649,12 +778,12 @@ ea_loop:
     rts
 ea_next:
     inx
-    cpx #NENEMIES
+    cpx nenem
     bne ea_loop
     clc
     rts
 
-; ---- player 2: the corner cursor + the wall spin ----
+; ---- player 2: ra's corner cursor + the wall spin ----
 upd_cursor:
     jsr read_joy2
     sta j2bits
@@ -689,26 +818,28 @@ uc_move:
     bcs uc_down
     lsr
     bcs uc_left
-    cpx #36              ; right: interior posts end at column 36
+    cpx kmaxx            ; right: the interior posts end here
     bcs uc_fire
     inx
     inx
     jmp uc_go
 uc_up:
-    cpy #4               ; top interior post row is 3
+    cpy kminy
     bcc uc_fire
+    beq uc_fire
     dey
     dey
     jmp uc_go
 uc_down:
-    cpy #21              ; bottom interior post row is 21
+    cpy kmaxy
     bcs uc_fire
     iny
     iny
     jmp uc_go
 uc_left:
-    cpx #3               ; left interior post column is 2
+    cpx kminx
     bcc uc_fire
+    beq uc_fire
     dex
     dex
 uc_go:
@@ -849,11 +980,20 @@ so_norun:
     jsr enemy_at
     bcs so_yes
     lda s_on
-    beq so_no
+    beq so_nosht
     lda sx
     cmp ttx
-    bne so_no
+    bne so_nosht
     lda sy
+    cmp tty
+    beq so_yes
+so_nosht:
+    lda es_on            ; the sting blocks a spin too
+    beq so_no
+    lda esx
+    cmp ttx
+    bne so_no
+    lda esy
     cmp tty
     beq so_yes
 so_no:
@@ -927,10 +1067,11 @@ ue_alive:
     jsr enemy_step
     lda endflag
     bne ue_out
+    jsr try_sting
 ue_next:
     inc ei
     lda ei
-    cmp #NENEMIES
+    cmp nenem
     bne ue_loop
 ue_out:
     rts
@@ -970,7 +1111,7 @@ etry_dir:                ; A = direction; C clear when it moved (or won)
     clc
     adc dytab,x
     sta tty
-    lda px               ; onto the runner: the round is over
+    lda px               ; onto the worker: the level is over
     cmp ttx
     bne en_norun
     lda py
@@ -1020,6 +1161,105 @@ en_move:
     clc
     rts
 
+; ---- a scorpion (odd index) spits a venom sting when it
+; lines up with the worker; one sting flies at a time ----
+try_sting:
+    lda ei
+    and #1
+    beq ts_no            ; scarabs do not shoot
+    lda es_on
+    bne ts_no
+    jsr rand8            ; menacing, not machine-gun constant
+    and #3
+    bne ts_no
+    ldx ei
+    lda ex,x
+    cmp px
+    beq ts_col
+    lda ey,x
+    cmp py
+    beq ts_row
+ts_no:
+    rts
+ts_col:                  ; same column: the sting flies vertically
+    lda #0
+    sta esdx
+    ldy #1
+    lda py
+    cmp ey,x
+    bcs ts_cgo
+    ldy #$ff
+ts_cgo:
+    sty esdy
+    jmp ts_fire
+ts_row:                  ; same row: horizontally
+    lda #0
+    sta esdy
+    ldy #1
+    lda px
+    cmp ex,x
+    bcs ts_rgo
+    ldy #$ff
+ts_rgo:
+    sty esdx
+ts_fire:
+    lda ex,x
+    sta esx
+    sta tgc
+    lda ey,x
+    sta esy
+    sta tgr
+    jsr set_target       ; the sprite pops in on the scorpion,
+    ldx #SP_STING        ; not gliding over from the last sting
+    jsr spr_jump
+    lda #1
+    sta es_on
+    lda #SFX_SHOT
+    jmp sfx_play
+
+; ---- the sting flies a char every other frame; a wall
+; swallows it, the worker dies on it ----
+upd_sting:
+    lda es_on
+    beq ust_done
+    lda framectr
+    and #1
+    bne ust_done
+    lda esx
+    clc
+    adc esdx
+    sta ttx
+    lda esy
+    clc
+    adc esdy
+    sta tty
+    lda px               ; onto the worker: the level is over
+    cmp ttx
+    bne ust_norun
+    lda py
+    cmp tty
+    bne ust_norun
+    lda #2
+    sta endflag
+    rts
+ust_norun:
+    ldx tty
+    jsr row_ptr
+    ldy ttx
+    lda (scrlo),y
+    cmp #CH_FLOOR
+    beq ust_fly
+    lda #0               ; a wall swallows it
+    sta es_on
+    rts
+ust_fly:
+    lda ttx
+    sta esx
+    lda tty
+    sta esy
+ust_done:
+    rts
+
 ; ---- per-frame flashes: the portal spins and blinks, the
 ; freshly spun walls flash white, the cursor shows the
 ; recharge state on its own color ----
@@ -1027,7 +1267,7 @@ upd_flash:
     jsr upd_portal       ; cycle the portal glyph
     ldx exrow
     jsr row_ptr
-    ldy #38
+    ldy excol
     lda framectr
     and #8
     bne uf_exw
@@ -1055,7 +1295,7 @@ uf_norf:
     lda #RED
     jmp uf_cset
 uf_hot:
-    lda #WHITE
+    lda #COL_HILITE
 uf_cset:
     sta SPRCOL+SP_CUR
     rts
@@ -1110,7 +1350,7 @@ us_clr:
     bpl us_clr
     rts
 
-; ---- the round clock, live on the status row ----
+; ---- the run clock, live on the status row ----
 upd_clock:
     lda tmin
     jsr two_digits
@@ -1137,7 +1377,7 @@ upd_sprites:
     lsr
     lsr
     sta frame8
-    ; the runner glides 2 pixels a frame
+    ; the worker glides 2 pixels a frame
     lda px
     sta tgc
     lda py
@@ -1165,6 +1405,16 @@ upd_sprites:
     jsr set_target
     ldx #SP_SHOT
     jsr spr_jump
+    ; the sting glides 4: a char every other frame, smoothly
+    lda esx
+    sta tgc
+    lda esy
+    sta tgr
+    jsr set_target
+    lda #4
+    sta gspd
+    ldx #SP_STING
+    jsr spr_glide
     ; the enemies glide 1
     lda #1
     sta gspd
@@ -1183,9 +1433,9 @@ us_en:
     jsr spr_glide
     ldx ptmp
     inx
-    cpx #NENEMIES
+    cpx nenem
     bne us_en
-    ; shapes: the runner bobs, each enemy waves on its own beat
+    ; shapes: the worker bobs, each enemy waves on its own beat
     lda frame8
     and #1
     clc
@@ -1195,6 +1445,8 @@ us_en:
     sta SPRPTR+SP_CUR
     lda #SPR_SHOT
     sta SPRPTR+SP_SHOT
+    lda #SPR_STING
+    sta SPRPTR+SP_STING
     ldx #0
 us_shape:
     txa
@@ -1202,23 +1454,30 @@ us_shape:
     adc frame8
     and #1
     sta rtmp
-    lda #SPR_ENA         ; enemies 0-1 are ghosts, 2-3 crawlers
-    cpx #2
-    bcc us_seta
+    txa
+    and #1               ; even index = scarab, odd = scorpion
+    beq us_scar
     lda #SPR_ENB
+    bne us_seta          ; always taken
+us_scar:
+    lda #SPR_ENA
 us_seta:
     clc
     adc rtmp
     sta SPRPTR+SP_EN,x
     inx
-    cpx #NENEMIES
+    cpx nenem
     bne us_shape
-    ; enable: runner + cursor + the bullet and the live enemies
+    ; enable: worker + cursor + bullet, sting, live enemies
     lda #%00000011
     ldy s_on
     beq us_nosht
     ora #%00000100
 us_nosht:
+    ldy es_on
+    beq us_nostg
+    ora #%10000000
+us_nostg:
     sta rtmp
     ldx #0
 us_alive:
@@ -1229,7 +1488,7 @@ us_alive:
     sta rtmp
 us_dead:
     inx
-    cpx #NENEMIES
+    cpx nenem
     bne us_alive
     lda rtmp
     sta SPR_EN
@@ -1238,18 +1497,31 @@ us_dead:
 ebit: !byte 8, 16, 32, 64
 
 ; ---- play texts ----
+txt_level: !scr "level"
 txt_goal:  !scr "exit "
            !byte CH_EXIT
 txt_goale:
-txt_hint:  !scr "p1: joy2/wasd   p2: joy1/ijkl"
+txt_hint:  !scr "worker: joy2/wasd  ra: joy1/ijkl"
 txt_hinte:
 txt_wait:  !scr "wait"
 txt_ready: !scr "ready"
 
 ; ---- play variables ----
-px:      !byte 0         ; runner position (screen col / row)
+mzsize:  !byte MZMIN     ; this level's cells per side (4-11)
+mzcw:    !byte 0         ; lattice cells across / down
+mzch:    !byte 0
+offx:    !byte 0         ; screen offset of the lattice
+offy:    !byte 0
+excol:   !byte 0         ; screen column of the right border wall
+enhalf:  !byte 0         ; enemies spawn from this cell column
+nenem:   !byte 0         ; live enemy slots this level (1-4)
+kminx:   !byte 0         ; ra's interior post bounds
+kmaxx:   !byte 0
+kminy:   !byte 0
+kmaxy:   !byte 0
+px:      !byte 0         ; worker position (screen col / row)
 py:      !byte 0
-fdx:     !byte 0         ; runner facing: the gun aims this way
+fdx:     !byte 0         ; worker facing: the gun aims this way
 fdy:     !byte 0
 kx:      !byte 0         ; corner cursor position (post col / row)
 ky:      !byte 0
@@ -1262,16 +1534,22 @@ sx:      !byte 0         ; bullet position and heading
 sy:      !byte 0
 sdx:     !byte 0
 sdy:     !byte 0
-rheld:   !byte 0         ; runner direction repeat state
+es_on:   !byte 0         ; venom sting in flight?
+esx:     !byte 0         ; sting position and heading
+esy:     !byte 0
+esdx:    !byte 0
+esdy:    !byte 0
+rheld:   !byte 0         ; worker direction repeat state
 rtimer:  !byte 0
 rdir:    !byte 0
-rfheld:  !byte 0         ; runner fire edge detection state
+rfheld:  !byte 0         ; worker fire edge detection state
 cheld:   !byte 0         ; cursor direction repeat state
 ctimer:  !byte 0
 cdir:    !byte 0
 cfheld:  !byte 0         ; cursor fire edge detection state
 j2bits:  !byte 0
 ptmp:    !byte 0         ; scratch
+lcnt:    !byte 0         ; draw_lattice column counter
 ttx:     !byte 0         ; move target (col / row)
 tty:     !byte 0
 nch:     !byte 0         ; the four slot chars around the cursor
@@ -1281,7 +1559,7 @@ wch:     !byte 0
 hlcol:   !byte 0         ; mark_slots color parameter
 latwcol: !byte 0         ; draw_lattice colors: walls, posts
 latpcol: !byte 0
-tframe:  !byte 0         ; round clock: frame, second, minute
+tframe:  !byte 0         ; run clock: frame, second, minute
 tsec:    !byte 0
 tmin:    !byte 0
 frame8:  !byte 0         ; framectr / 8: the animation beat
@@ -1296,10 +1574,10 @@ gtd:     !byte 0
 gnx:     !byte 0
 gny:     !byte 0
 gdlist:  !fill 4, 0
-ex:      !fill NENEMIES, 0   ; enemy positions, headings, colors
+multab:  !fill MZMAX, 0  ; row * mzcw for the visited index
+ex:      !fill NENEMIES, 0   ; enemy positions and headings
 ey:      !fill NENEMIES, 0
 edir:    !fill NENEMIES, 0
-ecol:    !fill NENEMIES, 0
 edead:   !fill NENEMIES, 0   ; respawn countdown, 0 = alive
 
 ; ---- maze generator buffers ----
