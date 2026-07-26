@@ -141,7 +141,9 @@ mu_start:
     beq mg_story
     +fadeto credits_init ; every screen change fades to black
 mg_play:
-    lda #MZMIN           ; a fresh run: level 1, clock zeroed
+    lda opt_level        ; a fresh run: the picked start level,
+    clc                  ; clock zeroed
+    adc #MZMIN-1
     sta mzsize
     lda #0
     sta tframe
