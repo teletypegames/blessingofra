@@ -4,6 +4,7 @@
   "author": "Teletype Games",
   "desc": "Two-player pyramid escape: a worker sealed in the great pyramid runs for the exit while Ra bends the maze walls around him. Scarabs and scorpions - and their flying venom stings - hunt him through eight levels, from a 4x4 maze up to 11x11.",
   "site": "https://git.teletypegames.org/games/labyrintwo",
+  "repo": "https://git.teletypegames.org/games/blessingofra",
   "license": "MIT",
   "version": "2.0.0"
 }
