@@ -97,6 +97,8 @@ CH_POST   = $e1          ; bolted plate: fixed pivot post
 CH_EXIT   = $e2          ; the portal out (4 animated glyph frames)
 CH_FLOOR  = $20          ; space: corridor
 CH_BAR    = $e3          ; 7 chars: a bar cell 1-7 pixels full
+CH_RELIC  = $31          ; the relics wear their order: '1'-'9'
+NRELIC    = 9            ; most relics on a level (level 8)
 
 ; ---- the actors are hardware sprites ----
 SP_RUN   = 0             ; player 1, the worker
@@ -113,6 +115,7 @@ COL_HILITE = YELLOW      ; walls the cursor's spin would move
 COL_SCARAB = CYAN        ; the scarabs
 COL_SCORP  = LRED        ; the scorpions
 COL_STING  = PURPLE      ; the venom sting
+COL_RELIC  = LBLUE       ; the numbered relics (relic order option)
 STATCOL  = BROWN         ; background band behind the status row
 
 ; ---- game timing ----

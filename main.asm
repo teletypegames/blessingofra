@@ -14,7 +14,8 @@
 ;   intro.asm   - TTG boot logo (ported from rabbitc64)
 ;   pyramid.asm - title card: the pyramid and the sun of ra
 ;   menu.asm    - main menu over a dark maze backdrop
-;   options.asm - optional extras: worker gun, spin cooldown
+;   options.asm - optional extras: worker gun, spin cooldown,
+;                 relic order
 ;   story.asm   - the legend + who steers what
 ;   credits.asm - the crew (content from rabbitc64, new look)
 ;   play.asm    - maze generation + the game itself

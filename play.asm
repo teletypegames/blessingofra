@@ -22,6 +22,10 @@
 ;               random cell after RESPAWN_TIME frames
 ;   opt_cool  - a spin starts a COOL_TIME recharge, shown as
 ;               a draining 1/8-step bar on the status row
+;   opt_relic - numbered relics are scattered over the cells;
+;               the worker must pick them up in order before
+;               the portal will take him, one more relic each
+;               level (2 on level 1 up to 9 on level 8)
 ;
 ; screen layout: status on row 0 (over the colored raster
 ; band), the centered lattice on rows 1-23, hints on row 24
@@ -37,7 +41,10 @@ play_init:
     sta SCREEN+6
     lda #YELLOW
     sta COLRAM+6
+    lda opt_relic        ; relic mode keeps its own counter here
+    bne pi_goal
     +prtext 0, 34, LGREY, txt_goal, txt_goale-txt_goal
+pi_goal:
     +prtext 24, 4, DGREY, txt_hint, txt_hinte-txt_hint
 
     lda mzsize           ; this level's lattice: a square
@@ -150,6 +157,7 @@ ps_exit:
     lda #COL_STING
     sta SPRCOL+SP_STING
 
+    jsr place_relics     ; first: the enemies then avoid their cells
     jsr spawn_enemies
 
     ; input state: fire still held from the previous screen
@@ -531,6 +539,165 @@ sn_free:
 etypecol: !byte COL_SCARAB, COL_SCORP
 
 ; ============================================================
+; the relics (relic order option) - numbered treasures on the
+; maze cells; the worker must collect them in order before
+; the portal will let him out
+; ============================================================
+
+; ---- scatter this level's relics over random cells: one
+; more each level, 2 on level 1 up to 9 on level 8 ----
+place_relics:
+    lda #0
+    sta rnext
+    sta rcount
+    sta ri
+    lda opt_relic
+    beq pl_done
+    lda mzsize           ; level 1-8 -> 2-9 relics
+    sec
+    sbc #MZMIN-2
+    sta rcount
+pl_one:
+    jsr rand8
+    and #$0f
+    cmp mzcw
+    bcs pl_one
+    asl                  ; cell column -> screen column
+    sec
+    adc offx
+    sta ttx
+pl_ry:
+    jsr rand8
+    and #$0f
+    cmp mzch
+    bcs pl_ry
+    asl
+    sec
+    adc offy
+    sta tty
+    lda ttx              ; never on the worker's own starting cell...
+    cmp px
+    bne pl_free
+    lda tty
+    cmp py
+    beq pl_one
+pl_free:
+    jsr relic_at         ; ...nor on a cell already holding one
+    bcs pl_one
+    ldx ri
+    lda ttx
+    sta rlx,x
+    lda tty
+    sta rly,x
+    jsr draw_relic
+    inc ri
+    lda ri
+    cmp rcount
+    bne pl_one
+pl_done:
+    rts
+
+; ---- stamp relic X on (ttx, tty): its order is its digit ----
+draw_relic:
+    txa
+    clc
+    adc #CH_RELIC
+    pha
+    ldx tty
+    jsr row_ptr
+    ldy ttx
+    pla
+    sta (scrlo),y
+    lda #COL_RELIC
+    sta (collo),y
+    rts
+
+; ---- C set when one of the ri placed relics sits on
+; (ttx, tty) - the placement loop's duplicate check ----
+relic_at:
+    ldx ri
+    beq rlk_no
+rlk_loop:
+    dex
+    lda rlx,x
+    cmp ttx
+    bne rlk_next
+    lda rly,x
+    cmp tty
+    beq rlk_yes
+rlk_next:
+    cpx #0
+    bne rlk_loop
+rlk_no:
+    clc
+    rts
+rlk_yes:
+    sec
+    rts
+
+; ---- the worker stepped onto a cell: if it holds the relic
+; that is next in the order, it goes into his hands ----
+take_relic:
+    lda opt_relic
+    beq tk_done
+    ldx rnext
+    cpx rcount
+    bcs tk_done          ; all of them already in hand
+    lda rlx,x
+    cmp px
+    bne tk_done
+    lda rly,x
+    cmp py
+    bne tk_done
+    ldx py               ; the cell goes back to plain corridor
+    jsr row_ptr
+    ldy px
+    lda #CH_FLOOR
+    sta (scrlo),y
+    lda #BLACK
+    sta (collo),y
+    inc rnext
+    lda #4               ; a white border blip marks the find
+    sta bflash
+    lda #WHITE
+    sta bcolor
+    lda #SFX_SELECT
+    jmp sfx_play
+tk_done:
+    rts
+
+; ---- C set when the portal will take the worker: always in
+; the classic game, once every relic is his in relic mode ----
+exit_open:
+    lda opt_relic
+    beq eo_yes
+    lda rnext
+    cmp rcount
+    bcc eo_no
+eo_yes:
+    sec
+    rts
+eo_no:
+    clc
+    rts
+
+; ---- C set when the char in A can be walked or flown
+; through: the corridor floor and the relics lying on it ----
+open_ch:
+    cmp #CH_FLOOR
+    beq oc_yes
+    cmp #CH_RELIC        ; the relic digits sit on open floor
+    bcc oc_no
+    cmp #CH_RELIC+NRELIC
+    bcs oc_no
+oc_yes:
+    sec
+    rts
+oc_no:
+    clc
+    rts
+
+; ============================================================
 ; one frame of play
 ; ============================================================
 play_update:
@@ -570,6 +737,7 @@ pu_nocool:
     jsr upd_cursor
     jsr upd_flash
     jsr upd_status
+    jsr upd_goal
     jsr upd_clock
     jmp upd_sprites
 pu_end:
@@ -658,9 +826,9 @@ ur_try:
     ldy ttx
     lda (scrlo),y
     cmp #CH_EXIT
-    beq ur_win
-    cmp #CH_FLOOR
-    bne ur_stop          ; a wall or a post: blocked
+    beq ur_exit
+    jsr open_ch
+    bcc ur_stop          ; a wall or a post: blocked
     jsr enemy_at         ; walking into an enemy still hurts
     bcs ur_dead
     lda es_on            ; and so does the venom sting
@@ -676,12 +844,17 @@ ur_go:
     sta px
     lda tty
     sta py
+    jmp take_relic       ; the cell may hold the next relic
 ur_stop:
     rts
-ur_win:
+ur_exit:
+    jsr exit_open
+    bcc ur_sealed
     lda #1
     sta endflag
     rts
+ur_sealed:               ; relics still out there: the portal is shut
+    jmp deny_blip
 ur_dead:
     lda #2
     sta endflag
@@ -703,8 +876,8 @@ upd_shot:
     jsr row_ptr
     ldy ttx
     lda (scrlo),y
-    cmp #CH_FLOOR
-    beq sh_open
+    jsr open_ch
+    bcs sh_open
     lda #0               ; a wall (or the portal) stops it
     sta s_on
     jmp sh_spawn
@@ -881,7 +1054,7 @@ do_rotate:
     lda cool
     beq dr_ready
 dr_deny:
-    jmp rot_deny         ; still recharging / a slot is taken
+    jmp deny_blip        ; still recharging / a slot is taken
 dr_ready:
     lda kx               ; nobody may stand in the four slots
     sta ttx
@@ -961,8 +1134,10 @@ dr_ready:
 dr_nocool:
     lda #SFX_ROTATE
     jmp sfx_play
-rot_deny:
-    lda #6               ; red border blip on a denied spin
+; ---- red border blip + buzz: a denied spin, or the worker
+; knocking on a portal the relics have not opened yet ----
+deny_blip:
+    lda #6
     sta bflash
     lda #RED
     sta bcolor
@@ -1126,8 +1301,8 @@ en_norun:
     jsr row_ptr
     ldy ttx
     lda (scrlo),y
-    cmp #CH_FLOOR
-    beq en_open
+    jsr open_ch
+    bcs en_open
     sec
     rts
 en_open:
@@ -1247,8 +1422,8 @@ ust_norun:
     jsr row_ptr
     ldy ttx
     lda (scrlo),y
-    cmp #CH_FLOOR
-    beq ust_fly
+    jsr open_ch
+    bcs ust_fly
     lda #0               ; a wall swallows it
     sta es_on
     rts
@@ -1268,6 +1443,8 @@ upd_flash:
     ldx exrow
     jsr row_ptr
     ldy excol
+    jsr exit_open
+    bcc uf_exlock
     lda framectr
     and #8
     bne uf_exw
@@ -1275,6 +1452,9 @@ upd_flash:
     jmp uf_exset
 uf_exw:
     lda #WHITE
+    jmp uf_exset
+uf_exlock:
+    lda #DGREY           ; sealed while a relic is still missing
 uf_exset:
     sta (collo),y
     lda rotflash         ; the spun walls flash, then re-highlight
@@ -1298,6 +1478,29 @@ uf_hot:
     lda #COL_HILITE
 uf_cset:
     sta SPRCOL+SP_CUR
+    ; fall through: the relic he is after next pulses white
+relic_blink:
+    lda opt_relic
+    beq rb_done
+    ldx rnext
+    cpx rcount
+    bcs rb_done
+    lda rlx,x
+    sta ptmp
+    lda rly,x
+    tax
+    jsr row_ptr
+    ldy ptmp
+    lda framectr
+    and #8
+    bne rb_white
+    lda #COL_RELIC
+    jmp rb_set
+rb_white:
+    lda #WHITE
+rb_set:
+    sta (collo),y
+rb_done:
     rts
 
 ; ---- status row: the spin recharge readout (cooldown option)
@@ -1348,6 +1551,38 @@ us_clr:
     sta SCREEN+23,x
     dex
     bpl us_clr
+    rts
+
+; ---- relic mode's readout in the goal corner: relics in
+; hand / relics on the level, next to the portal glyph; green
+; once the last one is his ----
+upd_goal:
+    lda opt_relic
+    bne ug_show
+    rts
+ug_show:
+    lda rnext
+    ora #$30
+    sta SCREEN+34
+    lda #$2f             ; '/'
+    sta SCREEN+35
+    lda rcount
+    ora #$30
+    sta SCREEN+36
+    lda #$20
+    sta SCREEN+37
+    lda #CH_EXIT
+    sta SCREEN+38
+    jsr exit_open
+    lda #LRED
+    bcc ug_col
+    lda #LGREEN
+ug_col:
+    ldx #4
+ug_loop:
+    sta COLRAM+34,x
+    dex
+    bpl ug_loop
     rts
 
 ; ---- the run clock, live on the status row ----
@@ -1529,6 +1764,9 @@ exrow:   !byte 0         ; screen row of the exit portal
 endflag: !byte 0         ; 0 = playing, 1 = escaped, 2 = caught
 cool:    !byte 0         ; spin recharge frames left (cooldown option)
 rotflash:!byte 0         ; frames the freshly spun walls stay white
+rcount:  !byte 0         ; relics on this level (relic order option)
+rnext:   !byte 0         ; the one he must pick up next
+ri:      !byte 0         ; relic placement loop index
 s_on:    !byte 0         ; bullet in flight?
 sx:      !byte 0         ; bullet position and heading
 sy:      !byte 0
@@ -1579,6 +1817,8 @@ ex:      !fill NENEMIES, 0   ; enemy positions and headings
 ey:      !fill NENEMIES, 0
 edir:    !fill NENEMIES, 0
 edead:   !fill NENEMIES, 0   ; respawn countdown, 0 = alive
+rlx:     !fill NRELIC, 0     ; relic positions (screen col / row)
+rly:     !fill NRELIC, 0
 
 ; ---- maze generator buffers ----
 visited: !fill NCELLS, 0

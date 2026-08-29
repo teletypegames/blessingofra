@@ -4,11 +4,14 @@
 ;                   respawns elsewhere after a pause
 ;   spin cooldown - ra needs a recharge between two spins,
 ;                   shown on the status row
+;   relic order   - numbered relics have to be collected in
+;                   order before the portal opens, one more
+;                   of them on every level
 ;   start level   - which level a fresh run begins on (1-8)
 ; the settings live here and survive between levels
 ; -----------------------------------------------------------
 
-OPT_ITEMS = 4
+OPT_ITEMS = 5
 
 options_init:
     jsr clear_screen
@@ -17,7 +20,8 @@ options_init:
 
     +prtext 21, 6, LGREY, txt_oh1, txt_oh1e-txt_oh1
     +prtext 22, 4, LGREY, txt_oh2, txt_oh2e-txt_oh2
-    +prtext 23, 5, LGREY, txt_oh3, txt_oh3e-txt_oh3
+    +prtext 23, 2, LGREY, txt_oh3, txt_oh3e-txt_oh3
+    +prtext 24, 5, LGREY, txt_oh4, txt_oh4e-txt_oh4
 
     lda #0
     sta optsel
@@ -56,7 +60,7 @@ ou_udrel:
     sta udheld
 ou_udend:
 
-    ; the three lines, the picked one in yellow
+    ; the option lines, the picked one in yellow
     ldx #0
 oo_items:
     txa
@@ -68,11 +72,14 @@ oo_items:
     cpx #OPT_ITEMS
     bne oo_items
 
-    ; the current values next to the three settings
+    ; the current value next to each setting
     ldx opt_shoot
-    lda #10
+    lda #7
     jsr put_oval
     ldx opt_cool
+    lda #10
+    jsr put_oval
+    ldx opt_relic
     lda #13
     jsr put_oval
     lda opt_level        ; the start level as a digit
@@ -83,6 +90,7 @@ oo_items:
 
     ; blinking '>' cursor in front of the picked line
     lda #$20
+    sta SCREEN+7*40+7
     sta SCREEN+10*40+7
     sta SCREEN+13*40+7
     sta SCREEN+16*40+7
@@ -110,10 +118,12 @@ ou_fire:
     jsr start_edge
     beq ou_done
     lda optsel
-    cmp #3
+    cmp #4
     beq ou_back
-    cmp #2
+    cmp #3
     beq ou_tlevel
+    cmp #2
+    beq ou_trelic
     cmp #1
     beq ou_tcool
     lda opt_shoot
@@ -124,6 +134,11 @@ ou_tcool:
     lda opt_cool
     eor #1
     sta opt_cool
+    jmp ou_tsfx
+ou_trelic:
+    lda opt_relic
+    eor #1
+    sta opt_relic
     jmp ou_tsfx
 ou_tlevel:
     ldx opt_level        ; cycle 1-8, wrapping back to 1
@@ -179,15 +194,15 @@ put_oval:
     jmp print_text
 
 ; ---- option tables ----
-oitem_lo:  !byte <txt_ogun, <txt_ocool, <txt_olev, <txt_oback
-oitem_hi:  !byte >txt_ogun, >txt_ocool, >txt_olev, >txt_oback
-oitem_len: !byte 10, 13, 11, 4
-oitem_row: !byte 10, 13, 16, 19
+oitem_lo:  !byte <txt_ogun, <txt_ocool, <txt_orel, <txt_olev, <txt_oback
+oitem_hi:  !byte >txt_ogun, >txt_ocool, >txt_orel, >txt_olev, >txt_oback
+oitem_len: !byte 10, 13, 11, 11, 4
+oitem_row: !byte 7, 10, 13, 16, 19
 ocur_lo:                 ; cursor cells: column 7 of those rows
-    !byte <(SCREEN+10*40+7), <(SCREEN+13*40+7)
+    !byte <(SCREEN+7*40+7), <(SCREEN+10*40+7), <(SCREEN+13*40+7)
     !byte <(SCREEN+16*40+7), <(SCREEN+19*40+7)
 ocur_hi:
-    !byte >(SCREEN+10*40+7), >(SCREEN+13*40+7)
+    !byte >(SCREEN+7*40+7), >(SCREEN+10*40+7), >(SCREEN+13*40+7)
     !byte >(SCREEN+16*40+7), >(SCREEN+19*40+7)
 ovtx_lo:   !byte <txt_off, <txt_on
 ovtx_hi:   !byte >txt_off, >txt_on
@@ -196,6 +211,7 @@ ovcol:     !byte LGREY, LGREEN
 ; ---- option texts ----
 txt_ogun:  !scr "worker gun"
 txt_ocool: !scr "spin cooldown"
+txt_orel:  !scr "relic order"
 txt_olev:  !scr "start level"
 txt_oback: !scr "back"
 txt_on:    !scr "on "
@@ -204,16 +220,20 @@ txt_oh1:   !scr "gun: p1 fire shoots a bullet"
 txt_oh1e:
 txt_oh2:   !scr "cooldown: spins need a recharge"
 txt_oh2e:
-txt_oh3:   !scr "start: a fresh run's first level"
+txt_oh3:   !scr "relics: grab the numbers in order"
 txt_oh3e:
+txt_oh4:   !scr "start: a fresh run's first level"
+txt_oh4e:
 
 ; ---- the settings themselves (session-wide) ----
-!ifdef FORCEOPTS {       ; test builds start with both turned on
+!ifdef FORCEOPTS {       ; test builds start with them all on
 opt_shoot: !byte 1
 opt_cool:  !byte 1
+opt_relic: !byte 1
 } else {
 opt_shoot: !byte 0       ; 0 = classic game, 1 = the worker shoots
 opt_cool:  !byte 0       ; 1 = spins need a recharge
+opt_relic: !byte 0       ; 1 = collect the relics in order first
 }
 opt_level: !byte 1       ; a fresh run's first level: 1-8
-optsel:    !byte 0       ; picked line: 0-3
+optsel:    !byte 0       ; picked line: 0-4

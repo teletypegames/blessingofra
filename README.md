@@ -30,7 +30,7 @@ cells, an animated exit portal, a raster color band behind the
 status row, and a fade to black between all screens. The menu floats
 over a dark maze backdrop under the big gold-washed title.
 
-The options screen adds two optional twists:
+The options screen adds three optional twists:
 
 - **worker gun** - player 1 shoots a bullet with fire/`space`; a hit
   enemy respawns on a random cell after a pause.
@@ -38,6 +38,13 @@ The options screen adds two optional twists:
   denied until the bar on the status row drains (pixel by pixel) and
   the readout flips back from *wait* to *ready* (the cursor also
   turns red while recharging).
+- **relic order** - numbered relics lie scattered over the corridors
+  and the worker has to gather them *in order*, 1 first, then 2, and
+  so on, before the portal will take him. Until the last one is his
+  the exit stays sealed (a dull grey, and bumping into it blips the
+  border red); the relic he is after next pulses white, and the
+  status row counts them off next to the portal glyph. Every level
+  adds one more: two on level 1 up to nine on level 8.
 
 Screens: TTG intro (ported from rabbitc64) -> pyramid title card
 (the pyramid, the trapped worker and the pulsing sun of Ra) -> main
@@ -60,8 +67,8 @@ Test builds can boot straight into one state:
 ```
 acme -DAUTOPLAY=1 -f cbm -o blessingofra.prg main.asm
 # also: AUTOOPTIONS, AUTOSTORY, AUTOPYRAMID, AUTOCREDITS,
-# AUTOWIN, AUTOLOSE; add -DFORCEOPTS=1 to start with both
-# options turned on
+# AUTOWIN, AUTOLOSE; add -DFORCEOPTS=1 to start with all
+# three options turned on
 ```
 
 ## Files
