@@ -28,7 +28,11 @@ CIA1_TA = $dc04          ; CIA1 timer A low byte: free-running entropy
 CHARSET = $3800          ; RAM charset: ROM font + the custom tiles
 SPRPTR  = SCREEN + $3f8  ; sprite shape pointers
 
-; ---- SID registers (single-voice SFX driver) ----
+; ---- SID registers ----
+; voice 1 belongs to the SFX driver, voices 2 and 3 to the
+; music player, which reaches their registers as SID+n,y
+; (y = 7 for voice 2, 14 for voice 3)
+SID      = $d400         ; the chip's base
 SID_V1FL = $d400         ; voice 1 frequency low
 SID_V1FH = $d401         ; voice 1 frequency high
 SID_V1PL = $d402         ; voice 1 pulse width low
@@ -48,6 +52,12 @@ SFX_LOSE   = 5           ; caught: descending sweep
 SFX_SHOT   = 6           ; gun / scorpion sting: short high tick
 SFX_HIT    = 7           ; enemy hit: noise burst
 NSFX       = 8
+
+; ---- music IDs ----
+MUS_TITLE = 0            ; the title song: intro, menu, story
+MUS_GAME  = 1            ; the drum groove under the levels
+MUS_WIN   = 2            ; the escape song
+MUS_LOSE  = 3            ; the game over dirge
 
 ; ---- colors ----
 BLACK   = 0
@@ -131,6 +141,7 @@ BUILD_STEPS = 8          ; maze carve animation: generator steps a frame
 ; ---- zero page pointers (same slots as rabbitc64) ----
 txtlo  = $f5             ; text pointer for the print routines (2 bytes)
 txthi  = $f6
+musptr = $f7             ; music player pattern pointer (2 bytes)
 updvec = $f9             ; state update vector (2 bytes)
 scrlo  = $fb
 scrhi  = $fc

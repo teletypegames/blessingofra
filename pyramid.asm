@@ -10,6 +10,8 @@ PYR_TIME = 250           ; frames before it advances on its own
 
 pyramid_init:
     jsr clear_screen
+    lda #MUS_TITLE
+    jsr music_play       ; already playing: it rolls on unbroken
 
     +prbig 1, 4, YELLOW, txt_t1, 8
     +prbig 7, 10, ORANGE, txt_t2, 5

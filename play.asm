@@ -33,6 +33,8 @@
 
 play_init:
     jsr clear_screen
+    lda #MUS_GAME
+    jsr music_play       ; the drum groove, held across the levels
     +prtext 0, 0, WHITE, txt_level, 5
     lda mzsize           ; level number 1-8 next to the label
     sec

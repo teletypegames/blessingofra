@@ -5,6 +5,8 @@
 
 win_init:
     jsr clear_screen
+    lda #MUS_WIN
+    jsr music_play       ; the escape song
 
     +prbig 3, 6, YELLOW, txt_escaped, 7
 

@@ -6,6 +6,8 @@
 
 story_init:
     jsr clear_screen
+    lda #MUS_TITLE
+    jsr music_play       ; already playing: it rolls on unbroken
 
     +prbig 1, 10, WHITE, txt_story, 5
 

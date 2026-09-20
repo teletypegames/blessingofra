@@ -23,6 +23,7 @@
 ;   over.asm    - game over screen with retry
 ;   common.asm  - shared routines, input, RNG, texts
 ;   sound.asm   - single-voice SFX driver
+;   music.asm   - two-voice music player (the other voices)
 ;   gfx.asm     - RAM charset, sprite engine, fades
 ;
 ; Build: acme -f cbm -o blessingofra.prg main.asm
@@ -54,6 +55,7 @@ start:
     sta fheld
     jsr gfx_init         ; RAM charset + VIC + sprite registers
     jsr sfx_init
+    jsr music_init
 
 !ifdef AUTOPLAY {        ; test builds boot straight into one state
     jsr play_init
@@ -106,6 +108,7 @@ mb_border:
     inc framectr
     jsr rand8            ; stir the RNG once per frame
     jsr sfx_update       ; advance the sound effect
+    jsr music_update     ; and the two music voices
     lda statbg           ; $ff = no band: update right away
     bmi mb_update
 mb_w1:
@@ -159,4 +162,5 @@ wf_hit:
 !src "over.asm"
 !src "common.asm"
 !src "sound.asm"
+!src "music.asm"
 !src "gfx.asm"

@@ -11,6 +11,8 @@ INTRO_TIME = 250         ; frames before it advances on its own
 
 intro_init:
     jsr clear_screen
+    lda #MUS_TITLE
+    jsr music_play       ; the song of the pyramid carries the whole front end
 
     ; T T G at columns 6 / 16 / 26
     lda #<glyph_t

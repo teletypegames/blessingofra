@@ -8,6 +8,8 @@
 
 credits_init:
     jsr clear_screen
+    lda #MUS_TITLE
+    jsr music_play       ; already playing: it rolls on unbroken
 
     ; rainbow bars: solid blocks across rows 0 and 24
     ldx #39

@@ -6,6 +6,8 @@
 
 lose_init:
     jsr clear_screen
+    lda #MUS_LOSE
+    jsr music_play       ; the dirge
 
     lda #RED             ; the border mourns with the letters
     sta borbase

@@ -30,6 +30,16 @@ cells, an animated exit portal, a raster color band behind the
 status row, and a fade to black between all screens. The menu floats
 over a dark maze backdrop under the big gold-washed title.
 
+Under it all runs the song of the pyramid: a two-voice SID score in
+the hijaz scale - the half step over the root and the step and a half
+above it - the sound the old desert asks for. Voice 2 carries the
+drone and a maqsum hand drum, voice 3 the reedy melody with its slow
+vibrato; voice 1 stays free for the sound effects. Four tunes take
+turns: the slow title song over the whole front end (it runs unbroken
+from the TTG logo to the menu), the drum groove under the levels, a
+climbing escape song and a dirge for the game over. The options screen
+switches the music off and on; the sound effects stay either way.
+
 The options screen adds three optional twists:
 
 - **worker gun** - player 1 shoots a bullet with fire/`space`; a hit
@@ -88,5 +98,7 @@ acme -DAUTOPLAY=1 -f cbm -o blessingofra.prg main.asm
 - `common.asm` - shared routines: printing, big block font, the
   title wash, input, RNG
 - `sound.asm` - single-voice SID SFX driver
+- `music.asm` - two-voice music player on SID voices 2 and 3:
+  the driver, the four tunes and their patterns
 - `gfx.asm` - RAM charset with the custom tiles, the sprite engine,
   the portal animation and the fade-to-black transition

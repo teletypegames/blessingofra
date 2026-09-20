@@ -9,6 +9,8 @@ MENU_ITEMS = 4
 
 menu_init:
     jsr clear_screen
+    lda #MUS_TITLE
+    jsr music_play       ; already playing: it rolls on unbroken
 
     ; a dark maze weaves behind the whole card
     lda #MAZE_CW
